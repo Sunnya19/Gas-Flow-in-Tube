@@ -1,0 +1,22 @@
+# Sizes
+width: 100.0
+height: 15.0
+
+# Particle info
+num_particles: 1000
+particle_radius: 0.1
+particle_mass: 1.0
+
+# Init temp
+initial_temperature: 1
+
+# Sim pars
+time_step: 0.005
+total_time: 10.0
+save_interval: 20
+
+#
+num_trajectory_particles: 10
+
+# Wall type
+wall_model_type: "specular"

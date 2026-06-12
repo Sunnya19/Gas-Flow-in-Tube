@@ -1,0 +1,19 @@
+# Dependencies for Molecular Dynamics Simulation
+# Python 3.12 or higher required
+
+numpy>=1.24.0
+
+matplotlib>=3.7.0
+
+# VTK export for ParaView
+pyvista>=0.43.0
+vtk>=9.3.0
+
+pytest>=7.4.0
+
+Optional (YAML support)
+pyyaml>=6.0
+
+# black>=23.0.0
+# flake8>=6.0.0
+# mypy>=1.0.0
