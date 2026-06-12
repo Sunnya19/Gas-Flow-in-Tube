@@ -1,6 +1,3 @@
-"""
-Main simulation class for molecular dynamics.
-"""
 from typing import Dict, List, Any
 import numpy as np
 
@@ -43,7 +40,6 @@ class Simulation:
         self._save_history()
     
     def _save_history(self):
-        """Save current state to history."""
         self.history['time'].append(self.state.time)
         
         # Calculate and save total energy
@@ -58,7 +54,6 @@ class Simulation:
         self.history['positions_sample'].append(tracked_positions)
     
     def step(self):
-        """Perform one simulation step."""
         # 1. Integrate positions
         self.state = self.integrator.step(self.state)
         
@@ -84,12 +79,6 @@ class Simulation:
         self.state.velocities = new_velocities
     
     def run(self) -> Dict[str, List[Any]]:
-        """
-        Run the complete simulation.
-        
-        Returns:
-            Dictionary with simulation history
-        """
         total_steps = self.config.num_steps
         
         # VTK export collections
@@ -146,16 +135,6 @@ class Simulation:
         return self.history
     
     def run_with_progress(self, progress_callback=None) -> Dict[str, List[Any]]:
-        """
-        Run simulation with progress reporting.
-        
-        Args:
-            progress_callback: Optional callback function that receives
-                (current_step, total_steps, current_time)
-                
-        Returns:
-            Dictionary with simulation history
-        """
         total_steps = self.config.num_steps
         
         # VTK export collections
