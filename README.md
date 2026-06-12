@@ -51,18 +51,25 @@ Gas-Flow-in-Tube/
 - **Particle-particle collisions**: each inter-molecular collision is counted and recorded per time step
 - **Particle-wall collisions**: each boundary crossing is counted as a separate collision (if a particle crosses a corner, both x and y boundary crossings are counted)
 - Collision counts are stored in `CollisionStats` dataclass and exported to history
+- The collision history stores **accumulated counts per save interval** (sum of collisions over all steps between saves), not per-step values
 
 #### Version 0.3 — Mean Free Path (λ_MD)
 - **λ_MD**: the average distance a particle travels between successive inter-molecular collisions
 - Wall collisions do **not** reset the free path — only particle-particle collisions reset it
 - If a particle participates in multiple collisions in the same time step, its free path is recorded only once
-- The mean free path is computed as the running average over all collected samples
+- The mean free path is computed as the running (cumulative) average over all collected samples
+
+#### Version 0.4 — Corrected Free Path Measurement
+- **First-flight exclusion**: the first free path of each particle (from simulation start to its first collision) is **not** recorded. Only paths between two consecutive particle-particle collisions are counted. This prevents artificially small λ_MD values at the beginning of the simulation.
+- **`has_previous_particle_collision`**: a per-particle boolean array tracks whether a particle has already experienced at least one inter-molecular collision. Free path samples are only recorded for particles with `has_previous_particle_collision=True`.
+- **Equilibration / burn-in**: the `equilibration_steps` config parameter allows running a number of steps before measurements begin. At the end of equilibration, all free path tracking state is reset, ensuring clean measurement data.
+- **`update_free_path_measurements()`**: the free path update logic is extracted into a standalone function for testability.
 
 ### Output Plots
 - `outputs/plots/energy.png` — Energy conservation over time
 - `outputs/plots/trajectories.png` — Tracked particle trajectories
-- `outputs/plots/collisions.png` — Particle-particle and particle-wall collision counts over time
-- `outputs/plots/mean_free_path.png` — λ_MD(t) evolution
+- `outputs/plots/collisions.png` — Particle-particle and particle-wall collision counts per save interval
+- `outputs/plots/mean_free_path.png` — Cumulative λ_MD(t) evolution (NaN values before measurements begin are masked)
 - `outputs/plots/free_path_histogram.png` — Distribution of free path lengths
 
 ### VTK Export

@@ -198,8 +198,8 @@ def plot_collision_counts(history: Dict[str, List[Any]], output_path: Optional[P
     ax.plot(time, wall_collisions, 'r-', linewidth=1.5, label='Particle-Wall')
 
     ax.set_xlabel('Time', fontsize=12)
-    ax.set_ylabel('Collisions per step', fontsize=12)
-    ax.set_title('Collision Counts', fontsize=14)
+    ax.set_ylabel('Collisions per save interval', fontsize=12)
+    ax.set_title('Collision Counts per Save Interval', fontsize=14)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=11)
 
@@ -222,14 +222,21 @@ def plot_collision_counts(history: Dict[str, List[Any]], output_path: Optional[P
 
 def plot_mean_free_path(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
     time = np.array(history['time'])
-    mfp_history = np.array(history['mean_free_path_history'])
+    mfp_history = np.array(history['mean_free_path_history'], dtype=float)
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    ax.plot(time, mfp_history, 'g-', linewidth=2, label=r'$\lambda_{MD}(t)$')
+    # Mask NaN values (pre-measurement points)
+    mask = ~np.isnan(mfp_history)
+    if np.any(mask):
+        ax.plot(time[mask], mfp_history[mask], 'g-', linewidth=2,
+                label=r'Cumulative $\lambda_{MD}(t)$')
+    else:
+        ax.text(0.5, 0.5, 'No measurement data', transform=ax.transAxes,
+                ha='center', va='center', fontsize=14)
 
     ax.set_xlabel('Time', fontsize=12)
-    ax.set_ylabel(r'Mean Free Path $\lambda_{MD}$', fontsize=12)
+    ax.set_ylabel(r'Cumulative mean free path $\lambda_{MD}$', fontsize=12)
     ax.set_title('Mean Free Path vs Time', fontsize=14)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=11)

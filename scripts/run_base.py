@@ -56,6 +56,7 @@ def run_base_simulation():
         time_step=0.005,
         total_time=10.0,
         save_interval=20,
+        equilibration_steps=500,
         num_trajectory_particles=5,
         wall_model_type="specular",
         save_vtk=True,
@@ -69,6 +70,7 @@ def run_base_simulation():
     print(f"  Temperature: {config.initial_temperature}")
     print(f"  Time step: {config.time_step}, Total time: {config.total_time}")
     print(f"  Steps: {config.num_steps}, Save every: {config.save_interval} steps")
+    print(f"  Equilibration steps: {config.equilibration_steps}")
     print(f"  Wall model: {config.wall_model_type}")
     if config.save_vtk:
         print(f"  VTK export: enabled (every {config.save_vtk_every} steps)")
@@ -102,11 +104,25 @@ def run_base_simulation():
     print(f"    Total particle collisions: {history['total_particle_collisions']}")
     print(f"    Total wall collisions: {history['total_wall_collisions']}")
 
-    print(f"\n  Mean free path:")
+    print(f"\n  Mean free path diagnostics:")
     mfp = history['mean_free_path']
-    n_samples = len(history['free_path_samples'])
+    samples = history['free_path_samples']
+    n_samples = len(samples)
     print(f"    lambda_MD: {mfp:.6f}")
-    print(f"    Free path samples: {n_samples}")
+    print(f"    Number of free path samples: {n_samples}")
+
+    if n_samples > 0:
+        import math
+        samples_arr = np.array(samples)
+        print(f"    Min free path: {np.min(samples_arr):.6f}")
+        print(f"    Max free path: {np.max(samples_arr):.6f}")
+        radius = config.particle_radius
+        frac_lt_r = np.sum(samples_arr < radius) / n_samples
+        frac_lt_2r = np.sum(samples_arr < 2 * radius) / n_samples
+        print(f"    Fraction of free paths < particle_radius: {frac_lt_r:.6f} ({frac_lt_r*100:.2f}%)")
+        print(f"    Fraction of free paths < 2*particle_radius: {frac_lt_2r:.6f} ({frac_lt_2r*100:.2f}%)")
+    else:
+        print(f"    (not enough samples)")
 
     # Relative energy drift
     initial_energy = energy_history[0]

@@ -62,9 +62,50 @@ def test_collision_stats_history_in_run():
     assert len(history["wall_collisions"]) > 0
 
 
+def test_collision_counts_per_interval():
+    """
+    Verify that collision history stores accumulated counts per save interval,
+    not per-step values. The sum of all history entries should equal the total.
+    """
+    from src.config import SimulationConfig
+    from src.simulation import Simulation
+
+    config = SimulationConfig(
+        width=20.0,
+        height=20.0,
+        num_particles=20,
+        particle_radius=0.2,
+        particle_mass=1.0,
+        initial_temperature=1.0,
+        time_step=0.01,
+        total_time=0.5,
+        save_interval=5,
+        num_trajectory_particles=3,
+        wall_model_type="specular",
+        save_vtk=False,
+    )
+
+    sim = Simulation(config)
+    history = sim.run()
+
+    # Sum of per-interval values should equal the total
+    total_from_history = sum(history["particle_collisions"])
+    assert total_from_history == history["total_particle_collisions"], (
+        f"Sum of per-interval collisions ({total_from_history}) "
+        f"does not match total ({history['total_particle_collisions']})"
+    )
+
+    total_wall_from_history = sum(history["wall_collisions"])
+    assert total_wall_from_history == history["total_wall_collisions"], (
+        f"Sum of per-interval wall collisions ({total_wall_from_history}) "
+        f"does not match total ({history['total_wall_collisions']})"
+    )
+
+
 if __name__ == "__main__":
     test_collision_stats_initial_state()
     test_collision_stats_record_step()
     test_collision_stats_multiple_steps()
     test_collision_stats_history_in_run()
+    test_collision_counts_per_interval()
     print("All collision stats tests passed!")

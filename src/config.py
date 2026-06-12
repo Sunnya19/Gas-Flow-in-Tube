@@ -20,6 +20,9 @@ class SimulationConfig:
     total_time: float = 10.0  # total simulation time
     save_interval: int = 10  # save history every N steps
 
+    # Equilibration / burn-in
+    equilibration_steps: int = 0  # steps to run before starting measurements
+
     # Sampling
     num_trajectory_particles: int = 5  # number of particles to track for trajectories
 
@@ -48,6 +51,8 @@ class SimulationConfig:
             raise ValueError("Total time must be positive")
         if self.save_interval <= 0:
             raise ValueError("Save interval must be positive")
+        if self.equilibration_steps < 0:
+            raise ValueError("equilibration_steps must be non-negative")
         if self.num_trajectory_particles <= 0:
             raise ValueError("Number of trajectory particles must be positive")
         if self.num_trajectory_particles > self.num_particles:

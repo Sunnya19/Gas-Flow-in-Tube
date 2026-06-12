@@ -10,7 +10,7 @@ from src.dynamics.particle_collisions import process_all_collisions
 from src.dynamics.wall_collisions import create_wall_model, process_wall_collisions
 from src.measurements.energy import calculate_total_energy
 from src.measurements.collision_stats import CollisionStats
-from src.measurements.mean_free_path import MeanFreePathStats
+from src.measurements.mean_free_path import MeanFreePathStats, update_free_path_measurements
 from src.io.vtk_writer import save_particles_vtp, save_pvd_file
 
 
@@ -44,6 +44,14 @@ class Simulation:
         # Mean free path tracking
         self.mfp_stats = MeanFreePathStats()
         self.path_since_last_collision = np.zeros(config.num_particles)
+        self.has_previous_particle_collision = np.zeros(config.num_particles, dtype=bool)
+
+        # Accumulators for collisions per save interval
+        self.particle_collisions_since_save = 0
+        self.wall_collisions_since_save = 0
+
+        # Equilibration tracking
+        self._measurement_enabled = (config.equilibration_steps == 0)
 
         # Select particles to track for trajectories
         self.tracked_particles = np.random.choice(
@@ -69,15 +77,13 @@ class Simulation:
         tracked_positions = self.state.positions[self.tracked_particles].copy()
         self.history['positions_sample'].append(tracked_positions)
 
-        # Save collision stats
-        self.history['particle_collisions'].append(
-            self.collision_stats.particle_collisions_history[-1]
-            if self.collision_stats.particle_collisions_history else 0
-        )
-        self.history['wall_collisions'].append(
-            self.collision_stats.wall_collisions_history[-1]
-            if self.collision_stats.wall_collisions_history else 0
-        )
+        # Save collision stats — accumulated values since last save
+        self.history['particle_collisions'].append(self.particle_collisions_since_save)
+        self.history['wall_collisions'].append(self.wall_collisions_since_save)
+
+        # Reset accumulators
+        self.particle_collisions_since_save = 0
+        self.wall_collisions_since_save = 0
 
         # Save mean free path history
         self.mfp_stats.record_current_mean()
@@ -103,19 +109,18 @@ class Simulation:
         self.state.positions = new_positions
         self.state.velocities = new_velocities
 
-        # Record particle collisions
+        # Record particle collisions for this step
         particle_collisions_this_step = len(collision_pairs)
+        self.particle_collisions_since_save += particle_collisions_this_step
 
-        # Record free paths for collided particles
-        if collision_pairs:
-            collided_particles = set()
-            for i, j in collision_pairs:
-                collided_particles.add(i)
-                collided_particles.add(j)
-            samples = [self.path_since_last_collision[p] for p in collided_particles]
-            self.mfp_stats.add_samples(samples)
-            for p in collided_particles:
-                self.path_since_last_collision[p] = 0.0
+        # Update free path measurements using the new logic
+        update_free_path_measurements(
+            self.path_since_last_collision,
+            self.has_previous_particle_collision,
+            collision_pairs,
+            self.mfp_stats,
+            self._measurement_enabled,
+        )
 
         # 3. Handle wall collisions
         new_positions, new_velocities, wall_collision_count = process_wall_collisions(
@@ -128,11 +133,25 @@ class Simulation:
         self.state.positions = new_positions
         self.state.velocities = new_velocities
 
+        self.wall_collisions_since_save += wall_collision_count
+
         # Record collision stats
         self.collision_stats.record_step(
             particle_collisions=particle_collisions_this_step,
             wall_collisions=wall_collision_count,
         )
+
+    def _handle_equilibration(self, step: int):
+        """Handle equilibration step logic."""
+        eq_steps = self.config.equilibration_steps
+        if eq_steps == 0:
+            return
+        if step == eq_steps - 1:
+            # Last equilibration step: reset all measurement state
+            self.path_since_last_collision[:] = 0.0
+            self.has_previous_particle_collision[:] = False
+            self.mfp_stats.clear()
+            self._measurement_enabled = True
 
     def run(self) -> Dict[str, List[Any]]:
         total_steps = self.config.num_steps
@@ -143,6 +162,9 @@ class Simulation:
 
         for step in range(total_steps):
             self.step()
+
+            # Handle equilibration boundary
+            self._handle_equilibration(step)
 
             # Save to history at specified intervals
             if step % self.config.save_interval == 0:
@@ -205,6 +227,9 @@ class Simulation:
 
         for step in range(total_steps):
             self.step()
+
+            # Handle equilibration boundary
+            self._handle_equilibration(step)
 
             # Save to history at specified intervals
             if step % self.config.save_interval == 0:

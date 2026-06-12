@@ -3,16 +3,16 @@ width: 100.0
 height: 15.0
 
 # Particle info
-num_particles: 1000
+num_particles: 400
 particle_radius: 0.1
 particle_mass: 1.0
 
 # Init temp
-initial_temperature: 1
+initial_temperature: 100
 
 # Sim pars
 time_step: 0.005
-total_time: 10.0
+total_time: 30.0
 save_interval: 20
 
 #
