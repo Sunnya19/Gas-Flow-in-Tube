@@ -1,9 +1,9 @@
 from typing import Tuple
 import numpy as np
 
-from ..wall_models.base import WallModel
-from ..wall_models.specular import SpecularWall
-from ..geometry.channel import RectangularChannel
+from src.wall_models.base import WallModel
+from src.wall_models.specular import SpecularWall
+from src.geometry.channel import RectangularChannel
 
 
 def create_wall_model(model_type: str, channel: RectangularChannel) -> WallModel:

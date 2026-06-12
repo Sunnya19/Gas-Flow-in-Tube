@@ -1,8 +1,8 @@
 from typing import Tuple
 import numpy as np
 
-from .state import SystemState
-from .geometry.channel import RectangularChannel
+from src.state import SystemState
+from src.geometry.channel import RectangularChannel
 
 
 def generate_random_positions(

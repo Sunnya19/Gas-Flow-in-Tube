@@ -2,12 +2,12 @@ import sys
 import yaml
 from pathlib import Path
 
-# Add src dir
-sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Add project root to path so imports work when running as python scripts/run_base.py
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from gas_md.config import SimulationConfig
-from gas_md.simulation import Simulation
-from gas_md.visualization.plots import plot_energy, plot_trajectories
+from src.config import SimulationConfig
+from src.simulation import Simulation
+from src.visualization.plots import plot_energy, plot_trajectories
 
 
 def load_config_from_yaml(yaml_path):
@@ -82,7 +82,7 @@ def run_base_simulation():
     print(f"  History points: {len(history['time'])}")
     
     # Calculate energy conservation
-    from gas_md.measurements.energy import calculate_energy_conservation
+    from src.measurements.energy import calculate_energy_conservation
     energy_history = history['total_energy']
     max_error, std_error = calculate_energy_conservation(energy_history)
     print(f"  Energy conservation:")
@@ -184,7 +184,7 @@ def run_custom_simulation(config_file=None):
         print(f"  History points: {len(history['time'])}")
         
         # Calculate energy conservation
-        from gas_md.measurements.energy import calculate_energy_conservation
+        from src.measurements.energy import calculate_energy_conservation
         energy_history = history['total_energy']
         max_error, std_error = calculate_energy_conservation(energy_history)
         print(f"  Energy conservation:")

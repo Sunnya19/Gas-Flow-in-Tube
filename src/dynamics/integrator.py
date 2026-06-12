@@ -1,5 +1,5 @@
 import numpy as np
-from ..state import SystemState
+from src.state import SystemState
 
 
 class EulerIntegrator:

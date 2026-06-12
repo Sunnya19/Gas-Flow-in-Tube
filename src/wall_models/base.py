@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Tuple
 import numpy as np
-from ..geometry.channel import RectangularChannel
+from src.geometry.channel import RectangularChannel
 
 
 class WallModel(ABC):

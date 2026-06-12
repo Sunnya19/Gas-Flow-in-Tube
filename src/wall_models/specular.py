@@ -1,8 +1,8 @@
 from typing import Tuple
 import numpy as np
 
-from .base import WallModel
-from ..geometry.channel import RectangularChannel
+from src.wall_models.base import WallModel
+from src.geometry.channel import RectangularChannel
 
 
 class SpecularWall(WallModel):
