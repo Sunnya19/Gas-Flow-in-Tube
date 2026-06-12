@@ -9,92 +9,56 @@ from src.dynamics.integrator import EulerIntegrator
 from src.dynamics.particle_collisions import process_all_collisions
 from src.dynamics.wall_collisions import create_wall_model, process_wall_collisions
 from src.measurements.energy import calculate_total_energy
-from src.measurements.collision_stats import CollisionStats
-from src.measurements.mean_free_path import MeanFreePathStats
 from src.io.vtk_writer import save_particles_vtp, save_pvd_file
 
 
 class Simulation:
-
+    
     def __init__(self, config: SimulationConfig):
         self.config = config
-
+        
         # init sys
         self.state, self.channel = initialize_system(config)
         self.integrator = EulerIntegrator(dt=config.time_step)
         self.wall_model = create_wall_model(config.wall_model_type, self.channel)
-
+        
         # History storage
         self.history: Dict[str, List[Any]] = {
             'time': [],
             'total_energy': [],
-            'positions_sample': [],
-            'particle_collisions': [],
-            'wall_collisions': [],
-            'total_particle_collisions': 0,
-            'total_wall_collisions': 0,
-            'mean_free_path': float("nan"),
-            'mean_free_path_history': [],
-            'free_path_samples': [],
+            'positions_sample': []  # Store positions of tracked particles
         }
-
-        # Collision stats
-        self.collision_stats = CollisionStats()
-
-        # Mean free path tracking
-        self.mfp_stats = MeanFreePathStats()
-        self.path_since_last_collision = np.zeros(config.num_particles)
-
+        
         # Select particles to track for trajectories
         self.tracked_particles = np.random.choice(
             config.num_particles,
             size=min(config.num_trajectory_particles, config.num_particles),
             replace=False
         )
-
+        
         # Save initial state
         self._save_history()
-
+    
     def _save_history(self):
         self.history['time'].append(self.state.time)
-
+        
         # Calculate and save total energy
         energy = calculate_total_energy(
             self.state.velocities,
             self.config.particle_mass
         )
         self.history['total_energy'].append(energy)
-
+        
         # Save positions of tracked particles
         tracked_positions = self.state.positions[self.tracked_particles].copy()
         self.history['positions_sample'].append(tracked_positions)
-
-        # Save collision stats
-        self.history['particle_collisions'].append(
-            self.collision_stats.particle_collisions_history[-1]
-            if self.collision_stats.particle_collisions_history else 0
-        )
-        self.history['wall_collisions'].append(
-            self.collision_stats.wall_collisions_history[-1]
-            if self.collision_stats.wall_collisions_history else 0
-        )
-
-        # Save mean free path history
-        self.mfp_stats.record_current_mean()
-        self.history['mean_free_path_history'].append(self.mfp_stats.mean_free_path())
-
+    
     def step(self):
-        dt = self.config.time_step
-
         # 1. Integrate positions
         self.state = self.integrator.step(self.state)
-
-        # Accumulate path length for mean free path
-        speeds = np.linalg.norm(self.state.velocities, axis=1)
-        self.path_since_last_collision += speeds * dt
-
+        
         # 2. Handle particle-particle collisions
-        new_positions, new_velocities, collision_pairs = process_all_collisions(
+        new_positions, new_velocities = process_all_collisions(
             self.state.positions,
             self.state.velocities,
             self.config.particle_radius,
@@ -102,57 +66,37 @@ class Simulation:
         )
         self.state.positions = new_positions
         self.state.velocities = new_velocities
-
-        # Record particle collisions
-        particle_collisions_this_step = len(collision_pairs)
-
-        # Record free paths for collided particles
-        if collision_pairs:
-            collided_particles = set()
-            for i, j in collision_pairs:
-                collided_particles.add(i)
-                collided_particles.add(j)
-            samples = [self.path_since_last_collision[p] for p in collided_particles]
-            self.mfp_stats.add_samples(samples)
-            for p in collided_particles:
-                self.path_since_last_collision[p] = 0.0
-
+        
         # 3. Handle wall collisions
-        new_positions, new_velocities, wall_collision_count = process_wall_collisions(
+        new_positions, new_velocities = process_wall_collisions(
             self.state.positions,
             self.state.velocities,
             self.wall_model,
             self.config.particle_radius,
-            dt
+            self.config.time_step
         )
         self.state.positions = new_positions
         self.state.velocities = new_velocities
-
-        # Record collision stats
-        self.collision_stats.record_step(
-            particle_collisions=particle_collisions_this_step,
-            wall_collisions=wall_collision_count,
-        )
-
+    
     def run(self) -> Dict[str, List[Any]]:
         total_steps = self.config.num_steps
-
+        
         # VTK export collections
         vtk_frame_paths = []
         vtk_frame_times = []
-
+        
         for step in range(total_steps):
             self.step()
-
+            
             # Save to history at specified intervals
             if step % self.config.save_interval == 0:
                 self._save_history()
-
+            
             # Save VTK frame if enabled
             if self.config.save_vtk and step % self.config.save_vtk_every == 0:
                 from pathlib import Path
                 frame_path = Path(self.config.vtk_output_dir) / f"particles_{step:06d}.vtp"
-
+                
                 save_particles_vtp(
                     positions=self.state.positions,
                     velocities=self.state.velocities,
@@ -161,10 +105,10 @@ class Simulation:
                 )
                 vtk_frame_paths.append(frame_path)
                 vtk_frame_times.append(self.state.time)
-
+        
         # Save final state to history
         self._save_history()
-
+        
         # Save final VTK frame if enabled and not already saved
         if self.config.save_vtk and (total_steps - 1) % self.config.save_vtk_every != 0:
             from pathlib import Path
@@ -177,7 +121,7 @@ class Simulation:
             )
             vtk_frame_paths.append(final_frame_path)
             vtk_frame_times.append(self.state.time)
-
+        
         # Create PVD collection file if any frames were saved
         if self.config.save_vtk and vtk_frame_paths:
             from pathlib import Path
@@ -187,34 +131,28 @@ class Simulation:
                 times=vtk_frame_times,
                 output_path=pvd_path,
             )
-
-        # Populate final totals in history
-        self.history['total_particle_collisions'] = self.collision_stats.particle_collision_count
-        self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
-        self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
-        self.history['free_path_samples'] = self.mfp_stats.free_path_samples
-
+        
         return self.history
-
+    
     def run_with_progress(self, progress_callback=None) -> Dict[str, List[Any]]:
         total_steps = self.config.num_steps
-
+        
         # VTK export collections
         vtk_frame_paths = []
         vtk_frame_times = []
-
+        
         for step in range(total_steps):
             self.step()
-
+            
             # Save to history at specified intervals
             if step % self.config.save_interval == 0:
                 self._save_history()
-
+            
             # Save VTK frame if enabled
             if self.config.save_vtk and step % self.config.save_vtk_every == 0:
                 from pathlib import Path
                 frame_path = Path(self.config.vtk_output_dir) / f"particles_{step:06d}.vtp"
-
+                
                 save_particles_vtp(
                     positions=self.state.positions,
                     velocities=self.state.velocities,
@@ -223,14 +161,14 @@ class Simulation:
                 )
                 vtk_frame_paths.append(frame_path)
                 vtk_frame_times.append(self.state.time)
-
+            
             # Report progress
             if progress_callback:
                 progress_callback(step, total_steps, self.state.time)
-
+        
         # Save final state to history
         self._save_history()
-
+        
         # Save final VTK frame if enabled and not already saved
         if self.config.save_vtk and (total_steps - 1) % self.config.save_vtk_every != 0:
             from pathlib import Path
@@ -243,7 +181,7 @@ class Simulation:
             )
             vtk_frame_paths.append(final_frame_path)
             vtk_frame_times.append(self.state.time)
-
+        
         # Create PVD collection file if any frames were saved
         if self.config.save_vtk and vtk_frame_paths:
             from pathlib import Path
@@ -253,18 +191,12 @@ class Simulation:
                 times=vtk_frame_times,
                 output_path=pvd_path,
             )
-
-        # Populate final totals in history
-        self.history['total_particle_collisions'] = self.collision_stats.particle_collision_count
-        self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
-        self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
-        self.history['free_path_samples'] = self.mfp_stats.free_path_samples
-
+        
         return self.history
-
+    
     def get_current_state(self) -> SystemState:
         return self.state.copy()
-
+    
     def get_history_array(self) -> Dict[str, np.ndarray]:
         return {
             'time': np.array(self.history['time']),

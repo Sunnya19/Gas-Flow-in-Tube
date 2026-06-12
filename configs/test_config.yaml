@@ -3,7 +3,7 @@ width: 100.0
 height: 15.0
 
 # Particle info
-num_particles: 100
+num_particles: 1000
 particle_radius: 0.1
 particle_mass: 1.0
 

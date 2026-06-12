@@ -21,7 +21,7 @@ def plot_energy(history: Dict[str, List[Any]], output_path: Optional[Path] = Non
     fig, ax = plt.subplots(figsize=(10, 6))
 
     ax.plot(time, energy, 'b-', linewidth=2, label='Total Energy')
-    ax.axhline(y=energy[0], color='r', linestyle='--', alpha=0.7, 
+    ax.axhline(y=energy[0], color='r', linestyle='--', alpha=0.7,
                label=f'Initial: {energy[0]:.4f}')
 
     ax.set_xlabel('Time', fontsize=12)
@@ -148,8 +148,8 @@ def plot_snapshot(positions: np.ndarray, velocities: np.ndarray,
 
     # Draw particles as circles
     for i, (x, y) in enumerate(positions):
-        circle = plt.Circle((x, y), particle_radius, 
-                            facecolor='blue', edgecolor='black', 
+        circle = plt.Circle((x, y), particle_radius,
+                            facecolor='blue', edgecolor='black',
                             alpha=0.7, linewidth=1)
         ax.add_patch(circle)
 
@@ -158,7 +158,7 @@ def plot_snapshot(positions: np.ndarray, velocities: np.ndarray,
         speed = np.sqrt(vx**2 + vy**2)
         if speed > 0:
             scale = 0.5  # Scale factor for visibility
-            ax.arrow(x, y, vx*scale, vy*scale, 
+            ax.arrow(x, y, vx*scale, vy*scale,
                      head_width=particle_radius*0.5, head_length=particle_radius*0.7,
                      fc='red', ec='red', alpha=0.8)
 
@@ -176,6 +176,101 @@ def plot_snapshot(positions: np.ndarray, velocities: np.ndarray,
     ax.text(0.02, 0.98, text_str, transform=ax.transAxes,
             fontsize=10, verticalalignment='top',
             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_collision_counts(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    time = np.array(history['time'])
+    particle_collisions = np.array(history['particle_collisions'])
+    wall_collisions = np.array(history['wall_collisions'])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(time, particle_collisions, 'b-', linewidth=1.5, label='Particle-Particle')
+    ax.plot(time, wall_collisions, 'r-', linewidth=1.5, label='Particle-Wall')
+
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Collisions per step', fontsize=12)
+    ax.set_title('Collision Counts', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
+
+    total_particle = history.get('total_particle_collisions', 0)
+    total_wall = history.get('total_wall_collisions', 0)
+    text_str = f'Total particle collisions: {total_particle}\nTotal wall collisions: {total_wall}'
+    ax.text(0.02, 0.98, text_str, transform=ax.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_mean_free_path(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    time = np.array(history['time'])
+    mfp_history = np.array(history['mean_free_path_history'])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.plot(time, mfp_history, 'g-', linewidth=2, label=r'$\lambda_{MD}(t)$')
+
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel(r'Mean Free Path $\lambda_{MD}$', fontsize=12)
+    ax.set_title('Mean Free Path vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
+
+    final_mfp = history.get('mean_free_path', float("nan"))
+    n_samples = len(history.get('free_path_samples', []))
+    text_str = f'Final λ_MD: {final_mfp:.4f}\nSamples: {n_samples}'
+    ax.text(0.02, 0.98, text_str, transform=ax.transAxes,
+            fontsize=10, verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_free_path_histogram(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    samples = history.get('free_path_samples', [])
+
+    if not samples:
+        print("No free path samples to plot")
+        return
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    ax.hist(samples, bins=50, density=True, alpha=0.7, color='green', edgecolor='black')
+
+    ax.set_xlabel('Free path length', fontsize=12)
+    ax.set_ylabel('Probability density', fontsize=12)
+    ax.set_title('Distribution of Free Paths Between Particle Collisions', fontsize=14)
+    ax.grid(True, alpha=0.3)
+
+    mean_val = np.mean(samples)
+    ax.axvline(mean_val, color='red', linestyle='--', linewidth=2,
+               label=f'Mean: {mean_val:.4f}')
+    ax.legend(fontsize=11)
 
     plt.tight_layout()
 

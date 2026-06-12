@@ -157,7 +157,7 @@ def test_process_all_collisions():
     ])
     radius = 1.0  # All particles overlapping
     
-    new_positions, new_velocities = process_all_collisions(
+    new_positions, new_velocities, _ = process_all_collisions(
         positions, velocities, radius, mass=1.0
     )
     
@@ -197,7 +197,7 @@ def test_collision_with_zero_distance():
     radius = 0.5
     
     # This should not crash
-    new_positions, new_velocities = process_all_collisions(
+    new_positions, new_velocities, _ = process_all_collisions(
         positions, velocities, radius, mass=1.0
     )
     

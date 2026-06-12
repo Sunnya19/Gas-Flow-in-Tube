@@ -89,19 +89,21 @@ def separate_overlapping_particles(positions: np.ndarray, i: int, j: int,
 
 
 def process_all_collisions(positions: np.ndarray, velocities: np.ndarray,
-                           radius: float, mass: float = 1.0) -> Tuple[np.ndarray, np.ndarray]:
+                           radius: float, mass: float = 1.0) -> Tuple[np.ndarray, np.ndarray, List[Tuple[int, int]]]:
     new_positions = positions.copy()
     new_velocities = velocities.copy()
 
     pairs = find_colliding_pairs(new_positions, radius)
+    collision_pairs = []
 
     for i, j in pairs:
         if check_approaching(new_positions, new_velocities, i, j):
             new_positions, new_velocities = handle_elastic_collision(
                 new_positions, new_velocities, i, j, mass
             )
+            collision_pairs.append((i, j))
 
         new_positions = separate_overlapping_particles(
             new_positions, i, j, radius)
 
-    return new_positions, new_velocities
+    return new_positions, new_velocities, collision_pairs

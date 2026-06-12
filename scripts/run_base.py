@@ -7,14 +7,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import SimulationConfig
 from src.simulation import Simulation
-from src.visualization.plots import plot_energy, plot_trajectories
+from src.visualization.plots import (
+    plot_energy,
+    plot_trajectories,
+    plot_collision_counts,
+    plot_mean_free_path,
+    plot_free_path_histogram,
+)
 
 
 def load_config_from_yaml(yaml_path):
-    
+
     with open(yaml_path, 'r') as f:
         config_dict = yaml.safe_load(f)
-    
+
     # use defaults
     config = SimulationConfig(
         width=config_dict.get('width', 20.0),
@@ -30,15 +36,15 @@ def load_config_from_yaml(yaml_path):
         wall_model_type=config_dict.get('wall_model_type', 'specular'),
         save_vtk=True,
         save_vtk_every=20,
-        vtk_output_dir="outputs/vtk"       
+        vtk_output_dir="outputs/vtk"
     )
-    
+
     return config
 
 
 def run_base_simulation():
     print("Starting basic molecular dynamics simulation...")
-    
+
     # Create configuration with default hardcoded values
     config = SimulationConfig(
         width=20.0,
@@ -56,7 +62,7 @@ def run_base_simulation():
         save_vtk_every=20,
         vtk_output_dir="outputs/vtk"
     )
-    
+
     print(f"Configuration:")
     print(f"  Domain: {config.width} x {config.height}")
     print(f"  Particles: {config.num_particles} (radius={config.particle_radius})")
@@ -69,18 +75,18 @@ def run_base_simulation():
         print(f"  VTK output directory: {config.vtk_output_dir}")
     else:
         print(f"  VTK export: disabled")
-    
+
     # Create and run simulation
     print("\nInitializing simulation...")
     sim = Simulation(config)
-    
+
     print("Running simulation...")
     history = sim.run()
-    
+
     print(f"Simulation completed!")
     print(f"  Final time: {sim.state.time:.3f}")
     print(f"  History points: {len(history['time'])}")
-    
+
     # Calculate energy conservation
     from src.measurements.energy import calculate_energy_conservation
     energy_history = history['total_energy']
@@ -90,38 +96,71 @@ def run_base_simulation():
     print(f"    Final energy: {energy_history[-1]:.6f}")
     print(f"    Max relative error: {max_error:.6f} ({max_error*100:.2f}%)")
     print(f"    Std relative error: {std_error:.6f} ({std_error*100:.2f}%)")
-    
+
+    # Print measurement statistics
+    print(f"\n  Collision statistics:")
+    print(f"    Total particle collisions: {history['total_particle_collisions']}")
+    print(f"    Total wall collisions: {history['total_wall_collisions']}")
+
+    print(f"\n  Mean free path:")
+    mfp = history['mean_free_path']
+    n_samples = len(history['free_path_samples'])
+    print(f"    lambda_MD: {mfp:.6f}")
+    print(f"    Free path samples: {n_samples}")
+
+    # Relative energy drift
+    initial_energy = energy_history[0]
+    final_energy = energy_history[-1]
+    if initial_energy != 0:
+        rel_drift = abs(final_energy - initial_energy) / abs(initial_energy)
+        print(f"\n  Relative energy drift: {rel_drift:.6f} ({rel_drift*100:.4f}%)")
+
     # Create output directories
     output_dir = Path(__file__).parent.parent / 'outputs'
     plots_dir = output_dir / 'plots'
     data_dir = output_dir / 'data'
-    
+
     plots_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Save plots
     print("\nGenerating plots...")
-    
+
     energy_plot_path = plots_dir / 'energy.png'
     plot_energy(history, energy_plot_path)
     print(f"  Energy plot saved to: {energy_plot_path}")
-    
+
     trajectories_plot_path = plots_dir / 'trajectories.png'
     plot_trajectories(history, trajectories_plot_path)
     print(f"  Trajectories plot saved to: {trajectories_plot_path}")
-    
+
+    collisions_plot_path = plots_dir / 'collisions.png'
+    plot_collision_counts(history, collisions_plot_path)
+    print(f"  Collisions plot saved to: {collisions_plot_path}")
+
+    mean_free_path_plot_path = plots_dir / 'mean_free_path.png'
+    plot_mean_free_path(history, mean_free_path_plot_path)
+    print(f"  Mean free path plot saved to: {mean_free_path_plot_path}")
+
+    free_path_histogram_path = plots_dir / 'free_path_histogram.png'
+    plot_free_path_histogram(history, free_path_histogram_path)
+    print(f"  Free path histogram saved to: {free_path_histogram_path}")
+
     # Save history data
     import numpy as np
     history_data = {
         'time': np.array(history['time']),
         'total_energy': np.array(history['total_energy']),
-        'positions_sample': np.array(history['positions_sample'])
+        'positions_sample': np.array(history['positions_sample']),
+        'particle_collisions': np.array(history['particle_collisions']),
+        'wall_collisions': np.array(history['wall_collisions']),
+        'mean_free_path_history': np.array(history['mean_free_path_history']),
     }
-    
+
     data_path = data_dir / 'simulation_history.npz'
     np.savez(data_path, **history_data)
     print(f"  History data saved to: {data_path}")
-    
+
     # Save final state
     final_state = sim.get_current_state()
     final_state_data = {
@@ -129,17 +168,17 @@ def run_base_simulation():
         'velocities': final_state.velocities,
         'time': final_state.time
     }
-    
+
     final_state_path = data_dir / 'final_state.npz'
     np.savez(final_state_path, **final_state_data)
     print(f"  Final state saved to: {final_state_path}")
-    
+
     print("\nSimulation completed successfully!")
     return history
 
 
 def run_custom_simulation(config_file=None):
-    
+
     if config_file:
         print(f"Loading configuration from: {config_file}")
         try:
@@ -151,14 +190,14 @@ def run_custom_simulation(config_file=None):
             config = None
     else:
         config = None
-    
+
     if config is None:
         # Use default configuration
         return run_base_simulation()
     else:
         # Run simulation with custom configuration
         print("Starting molecular dynamics simulation with custom configuration...")
-        
+
         print(f"Configuration:")
         print(f"  Domain: {config.width} x {config.height}")
         print(f"  Particles: {config.num_particles} (radius={config.particle_radius})")
@@ -171,18 +210,18 @@ def run_custom_simulation(config_file=None):
             print(f"  VTK output directory: {config.vtk_output_dir}")
         else:
             print(f"  VTK export: disabled")
-        
+
         # Create and run simulation
         print("\nInitializing simulation...")
         sim = Simulation(config)
-        
+
         print("Running simulation...")
         history = sim.run()
-        
+
         print(f"Simulation completed!")
         print(f"  Final time: {sim.state.time:.3f}")
         print(f"  History points: {len(history['time'])}")
-        
+
         # Calculate energy conservation
         from src.measurements.energy import calculate_energy_conservation
         energy_history = history['total_energy']
@@ -192,38 +231,71 @@ def run_custom_simulation(config_file=None):
         print(f"    Final energy: {energy_history[-1]:.6f}")
         print(f"    Max relative error: {max_error:.6f} ({max_error*100:.2f}%)")
         print(f"    Std relative error: {std_error:.6f} ({std_error*100:.2f}%)")
-        
+
+        # Print measurement statistics
+        print(f"\n  Collision statistics:")
+        print(f"    Total particle collisions: {history['total_particle_collisions']}")
+        print(f"    Total wall collisions: {history['total_wall_collisions']}")
+
+        print(f"\n  Mean free path:")
+        mfp = history['mean_free_path']
+        n_samples = len(history['free_path_samples'])
+        print(f"    lambda_MD: {mfp:.6f}")
+        print(f"    Free path samples: {n_samples}")
+
+        # Relative energy drift
+        initial_energy = energy_history[0]
+        final_energy = energy_history[-1]
+        if initial_energy != 0:
+            rel_drift = abs(final_energy - initial_energy) / abs(initial_energy)
+            print(f"\n  Relative energy drift: {rel_drift:.6f} ({rel_drift*100:.4f}%)")
+
         # Create output directories
         output_dir = Path(__file__).parent.parent / 'outputs'
         plots_dir = output_dir / 'plots'
         data_dir = output_dir / 'data'
-        
+
         plots_dir.mkdir(parents=True, exist_ok=True)
         data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save plots
         print("\nGenerating plots...")
-        
+
         energy_plot_path = plots_dir / 'energy.png'
         plot_energy(history, energy_plot_path)
         print(f"  Energy plot saved to: {energy_plot_path}")
-        
+
         trajectories_plot_path = plots_dir / 'trajectories.png'
         plot_trajectories(history, trajectories_plot_path)
         print(f"  Trajectories plot saved to: {trajectories_plot_path}")
-        
+
+        collisions_plot_path = plots_dir / 'collisions.png'
+        plot_collision_counts(history, collisions_plot_path)
+        print(f"  Collisions plot saved to: {collisions_plot_path}")
+
+        mean_free_path_plot_path = plots_dir / 'mean_free_path.png'
+        plot_mean_free_path(history, mean_free_path_plot_path)
+        print(f"  Mean free path plot saved to: {mean_free_path_plot_path}")
+
+        free_path_histogram_path = plots_dir / 'free_path_histogram.png'
+        plot_free_path_histogram(history, free_path_histogram_path)
+        print(f"  Free path histogram saved to: {free_path_histogram_path}")
+
         # Save history data
         import numpy as np
         history_data = {
             'time': np.array(history['time']),
             'total_energy': np.array(history['total_energy']),
-            'positions_sample': np.array(history['positions_sample'])
+            'positions_sample': np.array(history['positions_sample']),
+            'particle_collisions': np.array(history['particle_collisions']),
+            'wall_collisions': np.array(history['wall_collisions']),
+            'mean_free_path_history': np.array(history['mean_free_path_history']),
         }
-        
+
         data_path = data_dir / 'simulation_history.npz'
         np.savez(data_path, **history_data)
         print(f"  History data saved to: {data_path}")
-        
+
         # Save final state
         final_state = sim.get_current_state()
         final_state_data = {
@@ -231,18 +303,18 @@ def run_custom_simulation(config_file=None):
             'velocities': final_state.velocities,
             'time': final_state.time
         }
-        
+
         final_state_path = data_dir / 'final_state.npz'
         np.savez(final_state_path, **final_state_data)
         print(f"  Final state saved to: {final_state_path}")
-        
+
         print("\nSimulation completed successfully!")
         return history
 
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(
         description="Run molecular dynamics simulation of hard disks."
     )
@@ -251,9 +323,9 @@ if __name__ == "__main__":
         type=str,
         help="Path to configuration YAML file (e.g., configs/base_specular.yaml)"
     )
-    
+
     args = parser.parse_args()
-    
+
     try:
         run_custom_simulation(args.config)
     except KeyboardInterrupt:

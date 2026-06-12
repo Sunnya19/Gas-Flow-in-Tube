@@ -15,19 +15,24 @@ def create_wall_model(model_type: str, channel: RectangularChannel) -> WallModel
 
 def process_wall_collisions(positions: np.ndarray, velocities: np.ndarray,
                             wall_model: WallModel, radius: float,
-                            dt: float) -> Tuple[np.ndarray, np.ndarray]:
+                            dt: float) -> Tuple[np.ndarray, np.ndarray, int]:
     N = positions.shape[0]
     new_positions = positions.copy()
     new_velocities = velocities.copy()
+    wall_collision_count = 0
 
     for i in range(N):
         pos = positions[i]
         vel = velocities[i]
+        old_pos = pos.copy()
         new_pos, new_vel = wall_model.handle_collision(pos, vel, radius, dt)
         new_positions[i] = new_pos
         new_velocities[i] = new_vel
 
-    return new_positions, new_velocities
+        if not np.array_equal(new_pos, old_pos) or not np.array_equal(new_vel, vel):
+            wall_collision_count += 1
+
+    return new_positions, new_velocities, wall_collision_count
 
 
 def check_wall_collisions_simple(positions: np.ndarray, radius: float,
