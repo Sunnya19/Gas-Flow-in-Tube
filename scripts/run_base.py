@@ -22,6 +22,7 @@ from src.visualization.plots import (
     plot_mean_vx_vs_time,
     plot_mean_vy_vs_time,
     plot_temperature_vs_time,
+    plot_velocity_profile,
 )
 
 
@@ -208,6 +209,21 @@ def run_base_simulation():
     plot_temperature_vs_time(history, temperature_plot_path)
     print(f"  Temperature plot saved to: {temperature_plot_path}")
 
+    # Save velocity profile if available
+    y_profile = history.get('velocity_profile_y', [])
+    ux_profile = history.get('velocity_profile_ux', [])
+    if y_profile and ux_profile:
+        vp_csv = data_dir / 'velocity_profile.csv'
+        vp_df = pd.DataFrame({'y': y_profile, 'ux': ux_profile})
+        vp_df.to_csv(vp_csv, index=False)
+        print(f"  Velocity profile saved to: {vp_csv}")
+
+        vp_plot = plots_dir / 'velocity_profile.png'
+        # convert lists to numpy arrays for plotting
+        import numpy as _np
+        plot_velocity_profile(_np.array(y_profile), _np.array(ux_profile), vp_plot)
+        print(f"  Velocity profile plot saved to: {vp_plot}")
+
     flow_history_path = data_dir / 'flow_history.csv'
     flow_df = pd.DataFrame({
         'time': history['time'],
@@ -384,6 +400,20 @@ def run_custom_simulation(config_file=None):
         temperature_plot_path = plots_dir / 'temperature_vs_time.png'
         plot_temperature_vs_time(history, temperature_plot_path)
         print(f"  Temperature plot saved to: {temperature_plot_path}")
+
+        # Save velocity profile if available
+        y_profile = history.get('velocity_profile_y', [])
+        ux_profile = history.get('velocity_profile_ux', [])
+        if y_profile and ux_profile:
+            vp_csv = data_dir / 'velocity_profile.csv'
+            vp_df = pd.DataFrame({'y': y_profile, 'ux': ux_profile})
+            vp_df.to_csv(vp_csv, index=False)
+            print(f"  Velocity profile saved to: {vp_csv}")
+
+            vp_plot = plots_dir / 'velocity_profile.png'
+            import numpy as _np
+            plot_velocity_profile(_np.array(y_profile), _np.array(ux_profile), vp_plot)
+            print(f"  Velocity profile plot saved to: {vp_plot}")
 
         # Save history data
         history_data = {

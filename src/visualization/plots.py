@@ -258,6 +258,26 @@ def plot_mean_free_path(history: Dict[str, List[Any]], output_path: Optional[Pat
         plt.show()
 
 
+def plot_velocity_profile(y_centers: np.ndarray, ux_profile: np.ndarray, output_path: Optional[Path] = None):
+    """
+    Plot u_x(y) profile: x-axis u_x, y-axis y
+    """
+    fig, ax = plt.subplots(figsize=(6, 8))
+    ax.plot(ux_profile, y_centers, '-o')
+    ax.set_xlabel(r'$u_x$')
+    ax.set_ylabel('y')
+    ax.set_title('Velocity profile $u_x(y)$')
+    ax.grid(True)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
 def plot_mean_vx_vs_time(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
     time = np.array(history['time'])
     mean_vx = np.array(history.get('mean_vx', []), dtype=float)

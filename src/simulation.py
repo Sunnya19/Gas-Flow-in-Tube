@@ -13,6 +13,7 @@ from src.measurements.energy import calculate_total_energy
 from src.measurements.collision_stats import CollisionStats
 from src.measurements.mean_free_path import MeanFreePathStats, update_free_path_measurements
 from src.measurements.flow import compute_flow_temperature, compute_mean_flow_velocity
+from src.measurements.velocity_profile import compute_velocity_profile
 from src.io.vtk_writer import save_particles_vtp, save_pvd_file
 
 
@@ -245,6 +246,22 @@ class Simulation:
         self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
         self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
         self.history['free_path_samples'] = self.mfp_stats.free_path_samples
+
+        # Compute velocity profile from final state
+        try:
+            y_centers, ux_profile = compute_velocity_profile(
+                self.state.positions,
+                self.state.velocities,
+                height=self.config.height,
+                n_bins=self.config.velocity_profile_bins,
+            )
+            # store as lists for JSON/npz friendliness
+            self.history['velocity_profile_y'] = list(map(float, y_centers.tolist()))
+            self.history['velocity_profile_ux'] = list(map(float, ux_profile.tolist()))
+        except Exception:
+            # if something goes wrong, leave profile absent
+            self.history['velocity_profile_y'] = []
+            self.history['velocity_profile_ux'] = []
 
         return self.history
 

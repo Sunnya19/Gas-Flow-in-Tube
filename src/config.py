@@ -36,6 +36,8 @@ class SimulationConfig:
     # Driven flow settings
     external_force_x: float = 0.0  # constant force applied along x
     x_boundary_type: str = "reflective"  # options: "reflective", "periodic"
+    # Velocity profile sampling
+    velocity_profile_bins: int = 30  # number of bins for u_x(y)
 
     def __post_init__(self):
         if self.width <= 0 or self.height <= 0:
@@ -71,6 +73,9 @@ class SimulationConfig:
             raise ValueError(
                 f"x_boundary_type must be 'reflective' or 'periodic', got {self.x_boundary_type}"
             )
+
+        if self.velocity_profile_bins <= 0:
+            raise ValueError("velocity_profile_bins must be positive")
 
         # Check that particles can fit in the domain
         min_dim = min(self.width, self.height)
