@@ -187,6 +187,53 @@ def plot_snapshot(positions: np.ndarray, velocities: np.ndarray,
         plt.show()
 
 
+def plot_velocity_profile_comparison(y_centers: np.ndarray,
+                                     ux_profiles: np.ndarray,
+                                     labels: List[str],
+                                     output_path: Optional[Path] = None):
+    fig, ax = plt.subplots(figsize=(6, 8))
+    for profile, label in zip(ux_profiles, labels):
+        ax.plot(profile, y_centers, '-o', label=label)
+    ax.set_xlabel(r'$u_x$')
+    ax.set_ylabel('y')
+    ax.set_title('Velocity profile comparison')
+    ax.grid(True)
+    ax.legend()
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_time_series_comparison(time: np.ndarray,
+                                series: np.ndarray,
+                                labels: List[str],
+                                xlabel: str,
+                                ylabel: str,
+                                title: str,
+                                output_path: Optional[Path] = None):
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for line, label in zip(series, labels):
+        ax.plot(time, line, linewidth=2, label=label)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+    ax.grid(True)
+    ax.legend()
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
 def plot_collision_counts(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
     time = np.array(history['time'])
     particle_collisions = np.array(history['particle_collisions'])

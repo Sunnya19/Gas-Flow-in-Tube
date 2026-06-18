@@ -8,7 +8,10 @@ from src.initialization import initialize_system
 from src.dynamics.integrator import EulerIntegrator
 from src.dynamics.forces import apply_external_force
 from src.dynamics.particle_collisions import process_all_collisions
-from src.dynamics.wall_collisions import create_wall_model, process_wall_collisions
+from src.dynamics.wall_collisions import (
+    create_wall_model,
+    process_wall_collisions,
+)
 from src.measurements.energy import calculate_total_energy
 from src.measurements.collision_stats import CollisionStats
 from src.measurements.mean_free_path import MeanFreePathStats, update_free_path_measurements
@@ -26,7 +29,7 @@ class Simulation:
         self.state, self.channel = initialize_system(config)
         self.integrator = EulerIntegrator(dt=config.time_step)
         self.wall_model = create_wall_model(
-            config.wall_model_type,
+            config.wall_model,
             self.channel,
             x_boundary_type=config.x_boundary_type,
         )
@@ -40,6 +43,9 @@ class Simulation:
             'wall_collisions': [],
             'total_particle_collisions': 0,
             'total_wall_collisions': 0,
+            'specular_wall_collisions': 0,
+            'diffuse_wall_collisions': 0,
+            'thermal_wall_collisions': 0,
             'mean_free_path': float("nan"),
             'mean_free_path_history': [],
             'free_path_samples': [],
@@ -94,6 +100,9 @@ class Simulation:
         # Reset accumulators
         self.particle_collisions_since_save = 0
         self.wall_collisions_since_save = 0
+        self.specular_wall_collisions = 0
+        self.diffuse_wall_collisions = 0
+        self.thermal_wall_collisions = 0
 
         # Save mean free path history
         self.mfp_stats.record_current_mean()
@@ -154,17 +163,23 @@ class Simulation:
             self.state.positions[:, 0] = self.state.positions[:, 0] % self.channel.width
 
         # 3. Handle wall collisions
-        new_positions, new_velocities, wall_collision_count = process_wall_collisions(
+        new_positions, new_velocities, wall_collision_count, specular_count, diffuse_count, thermal_count = process_wall_collisions(
             self.state.positions,
             self.state.velocities,
             self.wall_model,
             self.config.particle_radius,
-            dt
+            dt,
+            self.channel,
+            self.config.x_boundary_type,
+            self.config.wall_temperature,
         )
         self.state.positions = new_positions
         self.state.velocities = new_velocities
 
         self.wall_collisions_since_save += wall_collision_count
+        self.specular_wall_collisions += specular_count
+        self.diffuse_wall_collisions += diffuse_count
+        self.thermal_wall_collisions += thermal_count
 
         # Record collision stats
         self.collision_stats.record_step(
@@ -244,6 +259,9 @@ class Simulation:
         # Populate final totals in history
         self.history['total_particle_collisions'] = self.collision_stats.particle_collision_count
         self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
+        self.history['specular_wall_collisions'] = self.specular_wall_collisions
+        self.history['diffuse_wall_collisions'] = self.diffuse_wall_collisions
+        self.history['thermal_wall_collisions'] = self.thermal_wall_collisions
         self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
         self.history['free_path_samples'] = self.mfp_stats.free_path_samples
 

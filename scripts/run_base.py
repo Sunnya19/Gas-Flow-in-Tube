@@ -43,7 +43,9 @@ def load_config_from_yaml(yaml_path):
         total_time=config_dict.get('total_time', 10.0),
         save_interval=config_dict.get('save_interval', 20),
         num_trajectory_particles=config_dict.get('num_trajectory_particles', 5),
+        wall_model=config_dict.get('wall_model', config_dict.get('wall_model_type', 'specular')),
         wall_model_type=config_dict.get('wall_model_type', 'specular'),
+        wall_temperature=config_dict.get('wall_temperature', 1.0),
         save_vtk=True,
         save_vtk_every=20,
         vtk_output_dir="outputs/vtk",
@@ -70,7 +72,9 @@ def run_base_simulation():
         save_interval=20,
         equilibration_steps=500,
         num_trajectory_particles=5,
+        wall_model="specular",
         wall_model_type="specular",
+        wall_temperature=1.0,
         save_vtk=True,
         save_vtk_every=20,
         vtk_output_dir="outputs/vtk",
@@ -87,7 +91,8 @@ def run_base_simulation():
     print(f"  Equilibration steps: {config.equilibration_steps}")
     print(f"  External force x: {config.external_force_x}")
     print(f"  X boundary: {config.x_boundary_type}")
-    print(f"  Wall model: {config.wall_model_type}")
+    print(f"  Wall model: {config.wall_model}")
+    print(f"  Wall temperature: {config.wall_temperature}")
     if config.save_vtk:
         print(f"  VTK export: enabled (every {config.save_vtk_every} steps)")
         print(f"  VTK output directory: {config.vtk_output_dir}")
@@ -224,6 +229,15 @@ def run_base_simulation():
         plot_velocity_profile(_np.array(y_profile), _np.array(ux_profile), vp_plot)
         print(f"  Velocity profile plot saved to: {vp_plot}")
 
+    wall_stats_path = data_dir / 'wall_collision_stats.csv'
+    wall_stats_df = pd.DataFrame([{
+        'specular_wall_collisions': history.get('specular_wall_collisions', 0),
+        'diffuse_wall_collisions': history.get('diffuse_wall_collisions', 0),
+        'thermal_wall_collisions': history.get('thermal_wall_collisions', 0),
+    }])
+    wall_stats_df.to_csv(wall_stats_path, index=False)
+    print(f"  Wall collision stats saved to: {wall_stats_path}")
+
     flow_history_path = data_dir / 'flow_history.csv'
     flow_df = pd.DataFrame({
         'time': history['time'],
@@ -291,7 +305,8 @@ def run_custom_simulation(config_file=None):
         print(f"  Temperature: {config.initial_temperature}")
         print(f"  Time step: {config.time_step}, Total time: {config.total_time}")
         print(f"  Steps: {config.num_steps}, Save every: {config.save_interval} steps")
-        print(f"  Wall model: {config.wall_model_type}")
+        print(f"  Wall model: {config.wall_model}")
+        print(f"  Wall temperature: {config.wall_temperature}")
         print(f"  External force x: {config.external_force_x}")
         print(f"  X boundary: {config.x_boundary_type}")
         if config.save_vtk:
@@ -414,6 +429,15 @@ def run_custom_simulation(config_file=None):
             import numpy as _np
             plot_velocity_profile(_np.array(y_profile), _np.array(ux_profile), vp_plot)
             print(f"  Velocity profile plot saved to: {vp_plot}")
+
+        wall_stats_path = data_dir / 'wall_collision_stats.csv'
+        wall_stats_df = pd.DataFrame([{
+            'specular_wall_collisions': history.get('specular_wall_collisions', 0),
+            'diffuse_wall_collisions': history.get('diffuse_wall_collisions', 0),
+            'thermal_wall_collisions': history.get('thermal_wall_collisions', 0),
+        }])
+        wall_stats_df.to_csv(wall_stats_path, index=False)
+        print(f"  Wall collision stats saved to: {wall_stats_path}")
 
         # Save history data
         history_data = {

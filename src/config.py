@@ -27,7 +27,9 @@ class SimulationConfig:
     num_trajectory_particles: int = 5  # number of particles to track for trajectories
 
     # Wall model type
-    wall_model_type: str = "specular"  # options: "specular", "diffuse", etc.
+    wall_model_type: str = "specular"  # options: "specular", "diffuse_same_speed", "diffuse_thermal"
+    wall_model: str = "specular"
+    wall_temperature: float = 1.0
 
     # VTK export settings
     save_vtk: bool = False  # whether to save VTK files for ParaView
@@ -73,6 +75,23 @@ class SimulationConfig:
             raise ValueError(
                 f"x_boundary_type must be 'reflective' or 'periodic', got {self.x_boundary_type}"
             )
+
+        if self.wall_model == "specular" and self.wall_model_type != "specular":
+            self.wall_model = self.wall_model_type
+        elif self.wall_model_type == "specular" and self.wall_model != "specular":
+            self.wall_model_type = self.wall_model
+        elif self.wall_model != self.wall_model_type:
+            raise ValueError(
+                "wall_model and wall_model_type must agree when both are provided"
+            )
+
+        if self.wall_model not in ("specular", "diffuse_same_speed", "diffuse_thermal"):
+            raise ValueError(
+                f"wall_model must be 'specular', 'diffuse_same_speed', or 'diffuse_thermal', got {self.wall_model}"
+            )
+
+        if self.wall_temperature < 0:
+            raise ValueError("wall_temperature must be non-negative")
 
         if self.velocity_profile_bins <= 0:
             raise ValueError("velocity_profile_bins must be positive")

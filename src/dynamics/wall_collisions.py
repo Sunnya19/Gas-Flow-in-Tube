@@ -1,39 +1,57 @@
 from typing import Tuple
 import numpy as np
 
-from src.wall_models.base import WallModel
-from src.wall_models.specular import SpecularWall
+from src.dynamics.walls import handle_wall_collision
 from src.geometry.channel import RectangularChannel
 
 
 def create_wall_model(model_type: str, channel: RectangularChannel,
-                      x_boundary_type: str = "reflective") -> WallModel:
-    if model_type == "specular":
-        return SpecularWall(channel, x_boundary_type=x_boundary_type)
-    else:
-        raise ValueError(f"Unknown wall model type: {model_type}")
+                      x_boundary_type: str = "reflective") -> str:
+    if model_type in ("specular", "diffuse_same_speed", "diffuse_thermal"):
+        return model_type
+    raise ValueError(f"Unknown wall model type: {model_type}")
 
 
 def process_wall_collisions(positions: np.ndarray, velocities: np.ndarray,
-                            wall_model: WallModel, radius: float,
-                            dt: float) -> Tuple[np.ndarray, np.ndarray, int]:
+                            wall_model: str, radius: float,
+                            dt: float, channel: RectangularChannel,
+                            x_boundary_type: str,
+                            wall_temperature: float) -> Tuple[np.ndarray, np.ndarray, int, int, int, int]:
     N = positions.shape[0]
     new_positions = positions.copy()
     new_velocities = velocities.copy()
-    wall_collision_count = 0
+    total_wall_collisions = 0
+    specular_collisions = 0
+    diffuse_collisions = 0
+    thermal_collisions = 0
 
     for i in range(N):
         pos = positions[i]
         vel = velocities[i]
-        old_pos = pos.copy()
-        new_pos, new_vel = wall_model.handle_collision(pos, vel, radius, dt)
+        new_pos, new_vel = handle_wall_collision(
+            pos, vel, radius, channel, wall_model,
+            x_boundary_type, wall_temperature
+        )
         new_positions[i] = new_pos
         new_velocities[i] = new_vel
 
-        if not np.array_equal(new_pos, old_pos) or not np.array_equal(new_vel, vel):
-            wall_collision_count += 1
+        if not np.array_equal(new_pos, pos) or not np.array_equal(new_vel, vel):
+            total_wall_collisions += 1
+            if wall_model == "specular":
+                specular_collisions += 1
+            elif wall_model == "diffuse_same_speed":
+                diffuse_collisions += 1
+            elif wall_model == "diffuse_thermal":
+                thermal_collisions += 1
 
-    return new_positions, new_velocities, wall_collision_count
+    return (
+        new_positions,
+        new_velocities,
+        total_wall_collisions,
+        specular_collisions,
+        diffuse_collisions,
+        thermal_collisions,
+    )
 
 
 def check_wall_collisions_simple(positions: np.ndarray, radius: float,
