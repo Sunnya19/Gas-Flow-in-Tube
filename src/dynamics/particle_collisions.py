@@ -89,7 +89,8 @@ def separate_overlapping_particles(positions: np.ndarray, i: int, j: int,
 
 
 def process_all_collisions(positions: np.ndarray, velocities: np.ndarray,
-                           radius: float, mass: float = 1.0) -> Tuple[np.ndarray, np.ndarray, List[Tuple[int, int]]]:
+                           radius: float, mass: float = 1.0,
+                           max_separation_iterations: int = 20) -> Tuple[np.ndarray, np.ndarray, List[Tuple[int, int]]]:
     new_positions = positions.copy()
     new_velocities = velocities.copy()
 
@@ -105,5 +106,18 @@ def process_all_collisions(positions: np.ndarray, velocities: np.ndarray,
 
         new_positions = separate_overlapping_particles(
             new_positions, i, j, radius)
+
+    # Iterative separation pass: resolve any residual overlaps
+    # that may remain after the main collision loop.
+    for _ in range(max_separation_iterations):
+        overlapping_pairs = find_colliding_pairs(new_positions, radius)
+        if not overlapping_pairs:
+            break
+        for i, j in overlapping_pairs:
+            new_positions = separate_overlapping_particles(
+                new_positions, i, j, radius)
+
+    # TODO: if overlapping_pairs still non-empty after max iterations,
+    # consider logging a warning. Not crashing to avoid brittle failures.
 
     return new_positions, new_velocities, collision_pairs

@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 
 from src.dynamics.walls import handle_wall_collision
@@ -16,7 +16,8 @@ def process_wall_collisions(positions: np.ndarray, velocities: np.ndarray,
                             wall_model: str, radius: float,
                             dt: float, channel: RectangularChannel,
                             x_boundary_type: str,
-                            wall_temperature: float) -> Tuple[np.ndarray, np.ndarray, int, int, int, int]:
+                            wall_temperature: float,
+                            rng: Optional[np.random.Generator] = None) -> Tuple[np.ndarray, np.ndarray, int, int, int, int]:
     N = positions.shape[0]
     new_positions = positions.copy()
     new_velocities = velocities.copy()
@@ -30,7 +31,7 @@ def process_wall_collisions(positions: np.ndarray, velocities: np.ndarray,
         vel = velocities[i]
         new_pos, new_vel = handle_wall_collision(
             pos, vel, radius, channel, wall_model,
-            x_boundary_type, wall_temperature
+            x_boundary_type, wall_temperature, rng=rng,
         )
         new_positions[i] = new_pos
         new_velocities[i] = new_vel

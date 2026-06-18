@@ -1,0 +1,4 @@
+wall_model,mean_vx_final,mean_vy_final,temperature_initial,temperature_final,energy_initial,energy_final,relative_energy_change,total_particle_collisions,total_wall_collisions,specular_wall_collisions,diffuse_wall_collisions,thermal_wall_collisions,mean_free_path,free_path_samples
+specular,0.0024999999999995005,0.06250739640487293,1.0,0.9980464126973425,50.0,50.000156250000025,3.125000000494538e-06,2,1,0,0,0,nan,0
+diffuse_same_speed,0.006681459270215624,0.061775440907642254,1.0,0.998078241934877,50.0,50.00043327167668,8.66543353353677e-06,2,1,0,0,0,nan,0
+diffuse_thermal,0.010806262351083012,0.03854514612615797,1.0,0.9792242376113497,50.0,49.001274470464665,-0.0199745105907067,2,1,0,0,0,nan,0

@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 
 import numpy as np
 from src.geometry.channel import RectangularChannel
@@ -49,7 +49,10 @@ def apply_specular_wall(position: np.ndarray, velocity: np.ndarray, radius: floa
 
 
 def apply_diffuse_same_speed_wall(position: np.ndarray, velocity: np.ndarray, radius: float,
-                                  channel: RectangularChannel, x_boundary_type: str) -> Tuple[np.ndarray, np.ndarray]:
+                                  channel: RectangularChannel, x_boundary_type: str,
+                                  rng: Optional[np.random.Generator] = None) -> Tuple[np.ndarray, np.ndarray]:
+    if rng is None:
+        rng = np.random.default_rng()
     new_position, new_velocity = _apply_x_boundary(position, velocity, radius, channel, x_boundary_type)
     collide_bottom = new_position[1] < radius
     collide_top = new_position[1] > channel.height - radius
@@ -60,10 +63,10 @@ def apply_diffuse_same_speed_wall(position: np.ndarray, velocity: np.ndarray, ra
             speed = 1e-6
 
         if collide_bottom:
-            angle = np.random.uniform(0.0, np.pi)
+            angle = rng.uniform(0.0, np.pi)
             new_position[1] = radius
         else:
-            angle = np.random.uniform(-np.pi, 0.0)
+            angle = rng.uniform(-np.pi, 0.0)
             new_position[1] = channel.height - radius
 
         new_velocity = np.array([
@@ -75,7 +78,10 @@ def apply_diffuse_same_speed_wall(position: np.ndarray, velocity: np.ndarray, ra
 
 def apply_diffuse_thermal_wall(position: np.ndarray, velocity: np.ndarray, radius: float,
                                channel: RectangularChannel, x_boundary_type: str,
-                               wall_temperature: float) -> Tuple[np.ndarray, np.ndarray]:
+                               wall_temperature: float,
+                               rng: Optional[np.random.Generator] = None) -> Tuple[np.ndarray, np.ndarray]:
+    if rng is None:
+        rng = np.random.default_rng()
     new_position, new_velocity = _apply_x_boundary(position, velocity, radius, channel, x_boundary_type)
     collide_bottom = new_position[1] < radius
     collide_top = new_position[1] > channel.height - radius
@@ -93,7 +99,7 @@ def apply_diffuse_thermal_wall(position: np.ndarray, velocity: np.ndarray, radiu
 
         # Reject samples that are directed into the wall
         while True:
-            sampled = np.random.normal(loc=0.0, scale=sigma, size=2)
+            sampled = rng.normal(loc=0.0, scale=sigma, size=2)
             if collide_bottom and sampled[1] > 0:
                 new_velocity = sampled
                 break
@@ -106,11 +112,12 @@ def apply_diffuse_thermal_wall(position: np.ndarray, velocity: np.ndarray, radiu
 
 def handle_wall_collision(position: np.ndarray, velocity: np.ndarray, radius: float,
                           channel: RectangularChannel, wall_model: str,
-                          x_boundary_type: str, wall_temperature: float) -> Tuple[np.ndarray, np.ndarray]:
+                          x_boundary_type: str, wall_temperature: float,
+                          rng: Optional[np.random.Generator] = None) -> Tuple[np.ndarray, np.ndarray]:
     if wall_model == "specular":
         return apply_specular_wall(position, velocity, radius, channel, x_boundary_type)
     if wall_model == "diffuse_same_speed":
-        return apply_diffuse_same_speed_wall(position, velocity, radius, channel, x_boundary_type)
+        return apply_diffuse_same_speed_wall(position, velocity, radius, channel, x_boundary_type, rng=rng)
     if wall_model == "diffuse_thermal":
-        return apply_diffuse_thermal_wall(position, velocity, radius, channel, x_boundary_type, wall_temperature)
+        return apply_diffuse_thermal_wall(position, velocity, radius, channel, x_boundary_type, wall_temperature, rng=rng)
     raise ValueError(f"Unknown wall model: {wall_model}")

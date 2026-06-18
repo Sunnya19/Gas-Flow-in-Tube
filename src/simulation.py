@@ -25,6 +25,9 @@ class Simulation:
     def __init__(self, config: SimulationConfig):
         self.config = config
 
+        # Create RNG for reproducibility of stochastic wall models
+        self.rng = np.random.default_rng(config.random_seed) if config.random_seed is not None else np.random.default_rng()
+
         # init sys
         self.state, self.channel = initialize_system(config)
         self.integrator = EulerIntegrator(dt=config.time_step)
@@ -70,8 +73,7 @@ class Simulation:
         self._measurement_enabled = (config.equilibration_steps == 0)
 
         # Select particles to track for trajectories
-        rng = np.random.default_rng(config.random_seed) if config.random_seed is not None else np.random.default_rng()
-        self.tracked_particles = rng.choice(
+        self.tracked_particles = self.rng.choice(
             config.num_particles,
             size=min(config.num_trajectory_particles, config.num_particles),
             replace=False
@@ -173,6 +175,7 @@ class Simulation:
             self.channel,
             self.config.x_boundary_type,
             self.config.wall_temperature,
+            rng=self.rng,
         )
         self.state.positions = new_positions
         self.state.velocities = new_velocities
