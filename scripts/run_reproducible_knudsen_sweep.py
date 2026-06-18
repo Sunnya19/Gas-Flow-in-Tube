@@ -7,11 +7,12 @@ Summary statistics and plots with error bars are generated.
 Usage:
     python scripts/run_reproducible_knudsen_sweep.py
 """
+
 import csv
 import sys
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import numpy as np
 
@@ -42,9 +43,6 @@ KN_PLOT = PLOTS_DIR / "kn_vs_N.png"
 PARTICLE_COUNTS: List[int] = [100, 200, 400, 800]
 SEEDS: List[int] = [1, 2, 3, 4, 5]
 
-# Characteristic length for Knudsen number (channel half-height)
-CHARACTERISTIC_LENGTH: float = 7.5  # height / 2 = 15.0 / 2
-
 
 def build_config(num_particles: int, seed: int) -> SimulationConfig:
     """Build a SimulationConfig for the given particle count and seed."""
@@ -72,9 +70,10 @@ def run_single_simulation(config: SimulationConfig) -> Dict[str, Any]:
     history = sim.run()
 
     mean_free_path = history["mean_free_path"]
+    characteristic_length = config.height / 2.0
     kn = compute_knudsen_number(
         mean_free_path=mean_free_path,
-        characteristic_length=CHARACTERISTIC_LENGTH,
+        characteristic_length=characteristic_length,
     )
     regime = classify_knudsen_number(kn) if np.isfinite(kn) else "unknown"
 

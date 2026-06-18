@@ -8,6 +8,7 @@ Usage:
     python scripts/run_flow.py
     python scripts/run_flow.py --force 0.005 --particles 200 --time 20.0
 """
+
 import argparse
 import sys
 from pathlib import Path

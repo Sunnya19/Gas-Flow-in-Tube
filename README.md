@@ -104,6 +104,9 @@ python tests/test_energy_conservation.py
 python tests/test_particle_collision.py
 python tests/test_wall_collision.py
 python tests/test_vtk_writer.py
+python tests/test_knudsen.py
+python tests/test_reproducibility.py
+python tests/test_flow.py
 ```
 
 ### Flow Simulation
