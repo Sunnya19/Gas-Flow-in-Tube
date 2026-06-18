@@ -116,6 +116,37 @@ class TestExtractFlowSummary:
         assert summary["mean_free_path"] == pytest.approx(2.5)
         assert summary["free_path_samples"] == 4
 
+    def test_late_time_mean_vx(self):
+        """Verify late-time mean_vx and std are computed correctly."""
+        history = _make_fake_history()
+        summary = extract_flow_summary(history, "specular")
+
+        # mean_vx = [0.00, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09]
+        # late_fraction=0.5 -> last 5 values: [0.05, 0.06, 0.07, 0.08, 0.09]
+        # mean = 0.07, std(ddof=1) = sqrt(((0.02^2+0.01^2+0+0.01^2+0.02^2)/4)) = sqrt(0.001/4) = sqrt(0.00025) ≈ 0.015811
+        assert summary["mean_vx_late_mean"] == pytest.approx(0.07)
+        assert summary["mean_vx_late_std"] == pytest.approx(np.std([0.05, 0.06, 0.07, 0.08, 0.09], ddof=1))
+
+    def test_late_time_empty_history(self):
+        """Empty mean_vx history should give nan for late-time stats."""
+        history: Dict[str, Any] = {
+            "total_energy": [],
+            "mean_vx": [],
+            "mean_vy": [],
+            "temperature": [],
+        }
+        summary = extract_flow_summary(history, "specular")
+        assert np.isnan(summary["mean_vx_late_mean"])
+        assert np.isnan(summary["mean_vx_late_std"])
+
+    def test_late_time_single_value(self):
+        """Single valid mean_vx value: late_mean = that value, late_std = nan."""
+        history = _make_fake_history()
+        history["mean_vx"] = [0.05]
+        summary = extract_flow_summary(history, "specular")
+        assert summary["mean_vx_late_mean"] == pytest.approx(0.05)
+        assert np.isnan(summary["mean_vx_late_std"])
+
     def test_missing_fields_default_to_zero_or_nan(self):
         """If history lacks collision subtype fields, should not crash."""
         history = _make_fake_history()

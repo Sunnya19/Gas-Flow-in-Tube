@@ -192,13 +192,34 @@ def plot_velocity_profile_comparison(y_centers: np.ndarray,
                                      labels: List[str],
                                      output_path: Optional[Path] = None):
     fig, ax = plt.subplots(figsize=(6, 8))
+    plotted_count = 0
     for profile, label in zip(ux_profiles, labels):
-        ax.plot(profile, y_centers, '-o', label=label)
-    ax.set_xlabel(r'$u_x$')
-    ax.set_ylabel('y')
-    ax.set_title('Velocity profile comparison')
-    ax.grid(True)
-    ax.legend()
+        # Mask NaN values to avoid connecting across empty bins
+        mask = np.isfinite(profile)
+        if np.sum(mask) < 2:
+            continue
+        ax.plot(profile[mask], y_centers[mask], '-o', label=label, markersize=4)
+        plotted_count += 1
+    ax.axvline(0.0, color='gray', linestyle=':', alpha=0.5, linewidth=1)
+
+    if plotted_count == 0:
+        ax.text(
+            0.5, 0.5,
+            "No velocity profile data\nincrease --time or reduce equilibration",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=12,
+        )
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(0, np.nanmax(y_centers) if len(y_centers) else 1)
+    else:
+        ax.legend(fontsize=10)
+
+    ax.set_xlabel(r'Mean streamwise velocity $u_x$', fontsize=12)
+    ax.set_ylabel('Channel coordinate $y$', fontsize=12)
+    ax.set_title('Time-averaged streamwise velocity profile', fontsize=13)
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
 
     if output_path:

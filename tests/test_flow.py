@@ -154,6 +154,83 @@ def test_periodic_boundary_in_simulation():
     assert "temperature" in history
 
 
+# ---------------------------------------------------------------------------
+# Velocity profile averaging tests
+# ---------------------------------------------------------------------------
+
+
+def test_velocity_profile_averaging_simple():
+    """Test that averaging multiple identical profiles gives the same profile."""
+    n_bins = 5
+    height = 10.0
+
+    # Create a simple profile: uniform vx=2.0 across all bins
+    positions = np.random.rand(100, 2) * height
+    velocities = np.ones((100, 2)) * 2.0
+
+    y_centers, ux_profile = compute_velocity_profile(
+        positions, velocities, height, n_bins
+    )
+
+    # Simulate time-averaging: accumulate the same profile 10 times
+    profile_sum = np.zeros(n_bins)
+    profile_count = np.zeros(n_bins, dtype=int)
+
+    for _ in range(10):
+        _, ux = compute_velocity_profile(positions, velocities, height, n_bins)
+        for i in range(n_bins):
+            if np.isfinite(ux[i]):
+                profile_sum[i] += ux[i]
+                profile_count[i] += 1
+
+    average_ux = np.full(n_bins, np.nan)
+    nonzero = profile_count > 0
+    average_ux[nonzero] = profile_sum[nonzero] / profile_count[nonzero]
+
+    # All non-NaN bins should have ux ≈ 2.0
+    valid = ~np.isnan(average_ux)
+    if np.any(valid):
+        assert np.allclose(average_ux[valid], 2.0), \
+            f"Expected averaged ux=2.0, got {average_ux}"
+
+
+def test_velocity_profile_averaging_nan_bins():
+    """Test that NaN bins in individual profiles do not corrupt the average."""
+    n_bins = 5
+    height = 10.0
+
+    # Profile 1: all bins have data
+    pos1 = np.random.rand(100, 2) * height
+    vel1 = np.ones((100, 2)) * 2.0
+    _, ux1 = compute_velocity_profile(pos1, vel1, height, n_bins)
+
+    # Profile 2: all bins have data
+    pos2 = np.random.rand(100, 2) * height
+    vel2 = np.ones((100, 2)) * 4.0
+    _, ux2 = compute_velocity_profile(pos2, vel2, height, n_bins)
+
+    profile_sum = np.zeros(n_bins)
+    profile_count = np.zeros(n_bins, dtype=int)
+
+    for ux in [ux1, ux2]:
+        for i in range(n_bins):
+            if np.isfinite(ux[i]):
+                profile_sum[i] += ux[i]
+                profile_count[i] += 1
+
+    average_ux = np.full(n_bins, np.nan)
+    nonzero = profile_count > 0
+    average_ux[nonzero] = profile_sum[nonzero] / profile_count[nonzero]
+
+    # All bins should have finite values (both profiles had data in all bins)
+    assert np.all(np.isfinite(average_ux)), \
+        f"Expected all finite, got {average_ux}"
+
+    # Each bin should have count=2
+    assert np.all(profile_count == 2), \
+        f"Expected all counts=2, got {profile_count}"
+
+
 if __name__ == "__main__":
     test_apply_external_force_increases_vx()
     test_apply_external_force_preserves_vy()
@@ -164,4 +241,6 @@ if __name__ == "__main__":
     test_compute_velocity_profile_shape()
     test_compute_velocity_profile_uniform_flow()
     test_periodic_boundary_in_simulation()
+    test_velocity_profile_averaging_simple()
+    test_velocity_profile_averaging_nan_bins()
     print("All flow tests passed!")

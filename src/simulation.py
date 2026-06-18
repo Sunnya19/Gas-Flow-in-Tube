@@ -16,7 +16,6 @@ from src.measurements.energy import calculate_total_energy
 from src.measurements.collision_stats import CollisionStats
 from src.measurements.mean_free_path import MeanFreePathStats, update_free_path_measurements
 from src.measurements.flow import compute_flow_temperature, compute_mean_flow_velocity
-from src.measurements.velocity_profile import compute_velocity_profile
 from src.io.vtk_writer import save_particles_vtp, save_pvd_file
 
 
@@ -69,6 +68,15 @@ class Simulation:
         self.particle_collisions_since_save = 0
         self.wall_collisions_since_save = 0
 
+        # Total subtype wall collision counters (never reset)
+        self.total_specular_wall_collisions = 0
+        self.total_diffuse_wall_collisions = 0
+        self.total_thermal_wall_collisions = 0
+
+        # Time-averaged velocity profile accumulators (particle-based sampling)
+        self.velocity_profile_vx_sum = np.zeros(config.velocity_profile_bins)
+        self.velocity_profile_sample_count = np.zeros(config.velocity_profile_bins, dtype=int)
+
         # Equilibration tracking
         self._measurement_enabled = (config.equilibration_steps == 0)
 
@@ -100,7 +108,7 @@ class Simulation:
         self.history['particle_collisions'].append(self.particle_collisions_since_save)
         self.history['wall_collisions'].append(self.wall_collisions_since_save)
 
-        # Reset accumulators
+        # Reset interval accumulators only (total counters are never reset)
         self.particle_collisions_since_save = 0
         self.wall_collisions_since_save = 0
         self.specular_wall_collisions = 0
@@ -116,6 +124,21 @@ class Simulation:
         self.history['temperature'].append(
             compute_flow_temperature(self.state.velocities, self.config.particle_mass)
         )
+
+        # Accumulate velocity profile for time-averaging (only after equilibration)
+        # Uses particle-based sampling: each particle's vx contributes to its y-bin
+        if self._measurement_enabled:
+            try:
+                bins = np.linspace(0.0, self.config.height, self.config.velocity_profile_bins + 1)
+                y = self.state.positions[:, 1]
+                vx = self.state.velocities[:, 0]
+                indices = np.digitize(y, bins) - 1
+                for i, bin_idx in enumerate(indices):
+                    if 0 <= bin_idx < self.config.velocity_profile_bins:
+                        self.velocity_profile_vx_sum[bin_idx] += vx[i]
+                        self.velocity_profile_sample_count[bin_idx] += 1
+            except Exception:
+                pass  # skip this frame if profile computation fails
 
     def step(self):
         dt = self.config.time_step
@@ -184,6 +207,11 @@ class Simulation:
         self.specular_wall_collisions += specular_count
         self.diffuse_wall_collisions += diffuse_count
         self.thermal_wall_collisions += thermal_count
+
+        # Accumulate into total subtype counters (never reset)
+        self.total_specular_wall_collisions += specular_count
+        self.total_diffuse_wall_collisions += diffuse_count
+        self.total_thermal_wall_collisions += thermal_count
 
         # Record collision stats
         self.collision_stats.record_step(
@@ -263,27 +291,31 @@ class Simulation:
         # Populate final totals in history
         self.history['total_particle_collisions'] = self.collision_stats.particle_collision_count
         self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
-        self.history['specular_wall_collisions'] = self.specular_wall_collisions
-        self.history['diffuse_wall_collisions'] = self.diffuse_wall_collisions
-        self.history['thermal_wall_collisions'] = self.thermal_wall_collisions
+        self.history['specular_wall_collisions'] = self.total_specular_wall_collisions
+        self.history['diffuse_wall_collisions'] = self.total_diffuse_wall_collisions
+        self.history['thermal_wall_collisions'] = self.total_thermal_wall_collisions
         self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
         self.history['free_path_samples'] = self.mfp_stats.free_path_samples
 
-        # Compute velocity profile from final state
+        # Compute time-averaged velocity profile from particle samples
         try:
-            y_centers, ux_profile = compute_velocity_profile(
-                self.state.positions,
-                self.state.velocities,
-                height=self.config.height,
-                n_bins=self.config.velocity_profile_bins,
+            n_bins = self.config.velocity_profile_bins
+            bins = np.linspace(0.0, self.config.height, n_bins + 1)
+            y_centers = 0.5 * (bins[:-1] + bins[1:])
+
+            average_ux = np.full(n_bins, np.nan, dtype=float)
+            mask = self.velocity_profile_sample_count > 0
+            average_ux[mask] = (
+                self.velocity_profile_vx_sum[mask] / self.velocity_profile_sample_count[mask]
             )
-            # store as lists for JSON/npz friendliness
             self.history['velocity_profile_y'] = list(map(float, y_centers.tolist()))
-            self.history['velocity_profile_ux'] = list(map(float, ux_profile.tolist()))
+            self.history['velocity_profile_ux'] = list(map(float, average_ux.tolist()))
+            self.history['velocity_profile_counts'] = list(map(int, self.velocity_profile_sample_count.tolist()))
         except Exception:
             # if something goes wrong, leave profile absent
             self.history['velocity_profile_y'] = []
             self.history['velocity_profile_ux'] = []
+            self.history['velocity_profile_counts'] = []
 
         return self.history
 
@@ -351,8 +383,30 @@ class Simulation:
         # Populate final totals in history
         self.history['total_particle_collisions'] = self.collision_stats.particle_collision_count
         self.history['total_wall_collisions'] = self.collision_stats.wall_collision_count
+        self.history['specular_wall_collisions'] = self.total_specular_wall_collisions
+        self.history['diffuse_wall_collisions'] = self.total_diffuse_wall_collisions
+        self.history['thermal_wall_collisions'] = self.total_thermal_wall_collisions
         self.history['mean_free_path'] = self.mfp_stats.mean_free_path()
         self.history['free_path_samples'] = self.mfp_stats.free_path_samples
+
+        # Compute time-averaged velocity profile from particle samples
+        try:
+            n_bins = self.config.velocity_profile_bins
+            bins = np.linspace(0.0, self.config.height, n_bins + 1)
+            y_centers = 0.5 * (bins[:-1] + bins[1:])
+
+            average_ux = np.full(n_bins, np.nan, dtype=float)
+            mask = self.velocity_profile_sample_count > 0
+            average_ux[mask] = (
+                self.velocity_profile_vx_sum[mask] / self.velocity_profile_sample_count[mask]
+            )
+            self.history['velocity_profile_y'] = list(map(float, y_centers.tolist()))
+            self.history['velocity_profile_ux'] = list(map(float, average_ux.tolist()))
+            self.history['velocity_profile_counts'] = list(map(int, self.velocity_profile_sample_count.tolist()))
+        except Exception:
+            self.history['velocity_profile_y'] = []
+            self.history['velocity_profile_ux'] = []
+            self.history['velocity_profile_counts'] = []
 
         return self.history
 

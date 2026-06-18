@@ -36,8 +36,11 @@ and energy/temperature histories.
 Usage:
 ------
     python scripts/run_wall_model_comparison.py
-    python scripts/run_wall_model_comparison.py --force 0.01 --particles 100 --time 10.0
+    python scripts/run_wall_model_comparison.py --force 0.01 --particles 150 --time 10.0
     python scripts/run_wall_model_comparison.py --particles 50 --time 0.5 --seed 1  # quick test
+
+For more stable physical profiles use:
+    python scripts/run_wall_model_comparison.py --particles 150 --time 10.0 --force 0.005 --seed 1
 """
 
 import argparse
@@ -99,9 +102,21 @@ def extract_flow_summary(history: Dict[str, Any], wall_model: str) -> Dict[str, 
     valid_vy = mean_vy_history[np.isfinite(mean_vy_history)]
     valid_temp = temperature_history[np.isfinite(temperature_history)]
 
+    # Late-time statistics: use last 50% of valid data
+    late_fraction = 0.5
+    if len(valid_vx) > 0:
+        late_vx = valid_vx[int(len(valid_vx) * (1 - late_fraction)):]
+        mean_vx_late_mean = float(np.mean(late_vx))
+        mean_vx_late_std = float(np.std(late_vx, ddof=1)) if len(late_vx) > 1 else float("nan")
+    else:
+        mean_vx_late_mean = float("nan")
+        mean_vx_late_std = float("nan")
+
     return {
         "wall_model": wall_model,
         "mean_vx_final": float(valid_vx[-1]) if len(valid_vx) > 0 else float("nan"),
+        "mean_vx_late_mean": mean_vx_late_mean,
+        "mean_vx_late_std": mean_vx_late_std,
         "mean_vy_final": float(valid_vy[-1]) if len(valid_vy) > 0 else float("nan"),
         "temperature_initial": float(valid_temp[0]) if len(valid_temp) > 0 else float("nan"),
         "temperature_final": float(valid_temp[-1]) if len(valid_temp) > 0 else float("nan"),
@@ -156,6 +171,8 @@ def build_config(
     external_force_x: float,
     random_seed: int,
     save_vtk: bool,
+    height: float = 15.0,
+    bins: int = 15,
 ) -> SimulationConfig:
     """
     Build a SimulationConfig for the wall model comparison.
@@ -169,22 +186,43 @@ def build_config(
     external_force_x : float
     random_seed : int
     save_vtk : bool
+    height : float
+        Channel height.
+    bins : int
+        Number of velocity profile bins.
 
     Returns
     -------
     SimulationConfig
     """
+    time_step = 0.005
+    save_interval = 20
+    total_steps = int(total_time / time_step)
+
+    # Adaptive equilibration: don't waste steps on short runs
+    if total_steps < 4 * save_interval:
+        equilibration_steps = 0
+    else:
+        equilibration_steps = min(500, total_steps // 5)
+
+    measurement_time_start = equilibration_steps * time_step
+
+    print(f"  total_steps           = {total_steps}")
+    print(f"  equilibration_steps   = {equilibration_steps}")
+    print(f"  measurement_time_start = {measurement_time_start:.3f}")
+    print()
+
     return SimulationConfig(
         width=20.0,
-        height=15.0,
+        height=height,
         num_particles=num_particles,
         particle_radius=0.1,
         particle_mass=1.0,
         initial_temperature=1.0,
-        time_step=0.005,
+        time_step=time_step,
         total_time=total_time,
-        save_interval=20,
-        equilibration_steps=500,
+        save_interval=save_interval,
+        equilibration_steps=equilibration_steps,
         num_trajectory_particles=5,
         wall_model=wall_model,
         wall_model_type=wall_model,
@@ -194,7 +232,7 @@ def build_config(
         vtk_output_dir="outputs/vtk_wall_compare",
         external_force_x=external_force_x,
         x_boundary_type="periodic",
-        velocity_profile_bins=30,
+        velocity_profile_bins=bins,
         random_seed=random_seed,
     )
 
@@ -210,14 +248,17 @@ def _plot_bar_chart(
     ylabel: str,
     title: str,
     output_path: Path,
+    errors: Optional[List[float]] = None,
 ) -> None:
-    """Simple bar chart using matplotlib (no seaborn)."""
+    """Simple bar chart using matplotlib (no seaborn), with optional error bars."""
     import matplotlib.pyplot as plt
 
     fig, ax = plt.subplots(figsize=(8, 5))
     x_pos = np.arange(len(labels))
     colours = ["steelblue", "darkorange", "seagreen"]
-    bars = ax.bar(x_pos, values, color=colours[: len(labels)], width=0.5, edgecolor="black")
+    bars = ax.bar(x_pos, values, color=colours[: len(labels)], width=0.5, edgecolor="black",
+                  yerr=[errors[i] if errors and np.isfinite(errors[i]) else 0.0 for i in range(len(labels))] if errors else None,
+                  capsize=5)
     ax.set_xticks(x_pos)
     ax.set_xticklabels(labels, rotation=15, fontsize=10)
     ax.set_ylabel(ylabel, fontsize=12)
@@ -285,6 +326,8 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
             external_force_x=args.force,
             random_seed=args.seed,
             save_vtk=args.save_vtk,
+            height=args.height,
+            bins=args.bins,
         )
         sim = Simulation(config)
         history = sim.run()
@@ -295,16 +338,35 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
         summaries.append(summary)
 
         # Print per-model summary
-        print(f"  mean_vx final: {summary['mean_vx_final']:.6f}")
-        print(f"  mean_vy final: {summary['mean_vy_final']:.6f}")
-        print(f"  temperature initial: {summary['temperature_initial']:.6f}")
-        print(f"  temperature final: {summary['temperature_final']:.6f}")
-        print(f"  energy initial: {summary['energy_initial']:.6f}")
-        print(f"  energy final: {summary['energy_final']:.6f}")
+        print(f"  mean_vx late-time mean: {summary['mean_vx_late_mean']:.6f}")
+        print(f"  mean_vx late-time std:  {summary['mean_vx_late_std']:.6f}")
+        print(f"  mean_vx final:          {summary['mean_vx_final']:.6f}")
+        print(f"  mean_vy final:          {summary['mean_vy_final']:.6f}")
+        print(f"  temperature initial:    {summary['temperature_initial']:.6f}")
+        print(f"  temperature final:      {summary['temperature_final']:.6f}")
+        print(f"  energy initial:         {summary['energy_initial']:.6f}")
+        print(f"  energy final:           {summary['energy_final']:.6f}")
         print(f"  relative energy change: {summary['relative_energy_change']:.6f}")
         print(f"  total particle collisions: {summary['total_particle_collisions']}")
-        print(f"  total wall collisions: {summary['total_wall_collisions']}")
-        print(f"  mean free path: {summary['mean_free_path']:.6f}")
+        print(f"  total wall collisions:     {summary['total_wall_collisions']}")
+        print(f"  specular wall collisions:  {summary['specular_wall_collisions']}")
+        print(f"  diffuse wall collisions:   {summary['diffuse_wall_collisions']}")
+        print(f"  thermal wall collisions:   {summary['thermal_wall_collisions']}")
+        print(f"  mean free path:         {summary['mean_free_path']:.6f}")
+        print()
+
+        # --- Profile diagnostics (Task 4) ---
+        profile_counts = history.get("velocity_profile_counts", [])
+        ux_profile = history.get("velocity_profile_ux", [])
+        finite_bins = sum(1 for v in ux_profile if np.isfinite(v))
+        total_profile_samples = int(sum(profile_counts))
+        print(f"  profile finite bins: {finite_bins} / {len(ux_profile) if hasattr(ux_profile, '__len__') else 0}")
+        print(f"  profile samples:     {total_profile_samples}")
+        if finite_bins < 3 or total_profile_samples == 0:
+            print("  WARNING: velocity profile has too little data. Increase --time or reduce equilibration.")
+        total_wc = summary["total_wall_collisions"]
+        if total_wc < 20:
+            print(f"  WARNING: very few wall collisions ({total_wc}); wall model comparison may be noisy.")
         print()
 
         # Extract velocity profile from history
@@ -327,6 +389,8 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
     field_names = [
         "wall_model",
         "mean_vx_final",
+        "mean_vx_late_mean",
+        "mean_vx_late_std",
         "mean_vy_final",
         "temperature_initial",
         "temperature_final",
@@ -387,39 +451,49 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
     )
     print(f"  Saved: {plots_dir / 'wall_models_mean_vx.png'}")
 
-    # 2. Temperature(t) for all three models
+    # 2. Temperature(t) for all three models with T_wall reference line
     temp_series = []
     for wm in wall_models:
         temp = np.array(histories[wm].get("temperature", []), dtype=float)
         temp_series.append(temp[:min_len])
 
-    plot_time_series_comparison(
-        common_time,
-        np.array(temp_series),
-        labels=wall_models,
-        xlabel="Time",
-        ylabel="Temperature",
-        title="Flow Temperature vs Time",
-        output_path=plots_dir / "wall_models_temperature.png",
-    )
-    print(f"  Saved: {plots_dir / 'wall_models_temperature.png'}")
+    # Use plot_time_series_comparison but add T_wall line via a custom plot
+    import matplotlib.pyplot as plt
 
-    # 3. Total energy(t) for all three models
-    energy_series = []
+    fig, ax = plt.subplots(figsize=(10, 6))
+    for line, label in zip(temp_series, wall_models):
+        ax.plot(common_time, line, linewidth=2, label=label)
+    ax.axhline(y=1.0, color='gray', linestyle='--', linewidth=1.5, alpha=0.7, label=r"$T_{\mathrm{wall}}$")
+    ax.set_xlabel("Time", fontsize=12)
+    ax.set_ylabel("Flow temperature", fontsize=12)
+    ax.set_title("Flow Temperature vs Time", fontsize=13)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=10)
+    plt.tight_layout()
+    temp_path = plots_dir / "wall_models_temperature.png"
+    temp_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(temp_path, dpi=150)
+    plt.close()
+    print(f"  Saved: {temp_path}")
+
+    # 3. Relative energy change plot: 100 * (E(t) - E(0)) / E(0)
+    fig, ax = plt.subplots(figsize=(10, 6))
     for wm in wall_models:
-        e = np.array(histories[wm]["total_energy"])
-        energy_series.append(e[:min_len])
-
-    plot_time_series_comparison(
-        common_time,
-        np.array(energy_series),
-        labels=wall_models,
-        xlabel="Time",
-        ylabel="Total Energy",
-        title="Total Energy vs Time",
-        output_path=plots_dir / "wall_models_energy.png",
-    )
-    print(f"  Saved: {plots_dir / 'wall_models_energy.png'}")
+        e = np.array(histories[wm]["total_energy"][:min_len])
+        e0 = e[0] if len(e) > 0 and e[0] != 0.0 else 1.0
+        relative_change = 100.0 * (e - e0) / abs(e0)
+        ax.plot(common_time, relative_change, linewidth=2, label=wm)
+    ax.set_xlabel("Time", fontsize=12)
+    ax.set_ylabel("Relative energy change, %", fontsize=12)
+    ax.set_title("Relative total energy change vs time", fontsize=13)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=10)
+    plt.tight_layout()
+    energy_path = plots_dir / "wall_models_energy.png"
+    energy_path.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(energy_path, dpi=150)
+    plt.close()
+    print(f"  Saved: {energy_path}")
 
     # 4. Velocity profile ux(y) for all three models
     vp_labels = []
@@ -441,14 +515,25 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
         )
         print(f"  Saved: {plots_dir / 'wall_models_velocity_profile.png'}")
 
-    # 5. Bar chart: final mean_vx for each model
-    final_vx_values = [s["mean_vx_final"] for s in summaries]
+    # 5. Bar chart: late-time mean_vx for each model with error bars
+    late_mean_values = [s["mean_vx_late_mean"] for s in summaries]
+    late_std_values = [s["mean_vx_late_std"] for s in summaries]
     _plot_bar_chart(
         labels=wall_models,
-        values=final_vx_values,
-        ylabel=r"Final $\langle v_x \rangle$",
-        title="Final Mean Streamwise Velocity by Wall Model",
+        values=late_mean_values,
+        ylabel=r"Late-time $\langle v_x \rangle$",
+        title="Late-time Mean Streamwise Velocity by Wall Model",
         output_path=plots_dir / "wall_models_final_mean_vx_bar.png",
+        errors=late_std_values,
+    )
+    # Also save under the more descriptive name
+    _plot_bar_chart(
+        labels=wall_models,
+        values=late_mean_values,
+        ylabel=r"Late-time $\langle v_x \rangle$",
+        title="Late-time Mean Streamwise Velocity by Wall Model",
+        output_path=plots_dir / "wall_models_late_mean_vx_bar.png",
+        errors=late_std_values,
     )
 
     # ------------------------------------------------------------------
@@ -457,23 +542,32 @@ def run_wall_model_comparison(args: argparse.Namespace) -> None:
     print("\n" + "=" * 70)
     print("Comparison Summary")
     print("=" * 70)
-    print(f"{'Wall Model':<22} {'Final <v_x>':<14} {'Final T':<14} {'Energy change':<14}")
+    print(f"{'Wall Model':<22} {'Late <v_x>':<14} {'Final T':<14} {'Energy change':<14}")
     print("-" * 70)
     for s in summaries:
         ec = s["relative_energy_change"]
         ec_str = f"{ec:.4f}" if np.isfinite(ec) else "nan"
+        lv = s["mean_vx_late_mean"]
+        lv_str = f"{lv:.6f}" if np.isfinite(lv) else "nan"
         print(
-            f"{s['wall_model']:<22} {s['mean_vx_final']:<14.6f} "
+            f"{s['wall_model']:<22} {lv_str:<14} "
             f"{s['temperature_final']:<14.6f} {ec_str:<14}"
         )
     print("-" * 70)
     print()
     print("Interpretation:")
-    print("  - Specular walls preserve tangential velocity → higher drift velocity.")
-    print("  - Diffuse walls randomise direction → stronger drag, lower drift.")
-    print("  - Thermal wall re-thermalises to T_wall → may stabilise gas temperature.")
+    print("  - Specular walls preserve tangential velocity; this often leads to")
+    print("    weaker wall drag, but finite-time noisy runs should be interpreted")
+    print("    using late-time averages.")
+    print("  - Diffuse_same_speed walls randomise outgoing direction while preserving")
+    print("    speed, changing the drift and velocity profile.")
+    print("  - Diffuse_thermal walls also exchange energy with a wall-temperature")
+    print("    reservoir, so temperature and total energy can change.")
     print()
     print("Wall model comparison completed successfully!")
+    print()
+    print("Recommended informative run:")
+    print("  python scripts/run_wall_model_comparison.py --particles 80 --time 3.0 --height 6.0 --bins 15 --force 0.005 --seed 1 --no-vtk")
 
 
 # ---------------------------------------------------------------------------
@@ -490,16 +584,24 @@ def main() -> None:
         help="External force along x (default: 0.005)",
     )
     parser.add_argument(
-        "--particles", type=int, default=200,
-        help="Number of particles (default: 200)",
+        "--particles", type=int, default=100,
+        help="Number of particles (default: 100)",
     )
     parser.add_argument(
-        "--time", type=float, default=20.0,
-        help="Total simulation time (default: 20.0)",
+        "--time", type=float, default=3.0,
+        help="Total simulation time (default: 3.0)",
     )
     parser.add_argument(
         "--seed", type=int, default=1,
         help="Random seed for reproducibility (default: 1)",
+    )
+    parser.add_argument(
+        "--height", type=float, default=15.0,
+        help="Channel height (default: 15.0). For clearer wall-model differences, try --height 6.0.",
+    )
+    parser.add_argument(
+        "--bins", type=int, default=15,
+        help="Number of velocity profile bins (default: 15).",
     )
     parser.add_argument(
         "--save-vtk", action="store_true",
