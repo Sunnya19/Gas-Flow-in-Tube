@@ -1,0 +1,13 @@
+width: 100.0
+height: 15.0
+num_particles: 400
+particle_radius: 0.1
+particle_mass: 1.0
+initial_temperature: 10.0
+time_step: 0.01
+total_time: 30.0
+save_interval: 10
+num_trajectory_particles: 6
+wall_model_type: "specular"
+external_force_x: 0
+x_boundary_type: "periodic"

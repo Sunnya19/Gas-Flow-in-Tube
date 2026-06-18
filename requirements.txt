@@ -8,6 +8,7 @@ matplotlib>=3.7.0
 # VTK export for ParaView
 pyvista>=0.43.0
 vtk>=9.3.0
+ pandas>=2.0.0
 
 pytest>=7.4.0
 

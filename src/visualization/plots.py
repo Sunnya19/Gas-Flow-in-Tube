@@ -258,6 +258,66 @@ def plot_mean_free_path(history: Dict[str, List[Any]], output_path: Optional[Pat
         plt.show()
 
 
+def plot_mean_vx_vs_time(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    time = np.array(history['time'])
+    mean_vx = np.array(history.get('mean_vx', []), dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(time, mean_vx, 'b-o', linewidth=2, markersize=4)
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Mean $v_x$', fontsize=12)
+    ax.set_title('Mean Flow Velocity $v_x$ vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_mean_vy_vs_time(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    time = np.array(history['time'])
+    mean_vy = np.array(history.get('mean_vy', []), dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(time, mean_vy, 'g-o', linewidth=2, markersize=4)
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Mean $v_y$', fontsize=12)
+    ax.set_title('Mean Flow Velocity $v_y$ vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_temperature_vs_time(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    time = np.array(history['time'])
+    temperature = np.array(history.get('temperature', []), dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(time, temperature, 'r-o', linewidth=2, markersize=4)
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Temperature', fontsize=12)
+    ax.set_title('Flow Temperature vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
 def plot_free_path_histogram(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
     samples = history.get('free_path_samples', [])
 

@@ -6,9 +6,10 @@ from src.wall_models.specular import SpecularWall
 from src.geometry.channel import RectangularChannel
 
 
-def create_wall_model(model_type: str, channel: RectangularChannel) -> WallModel:
+def create_wall_model(model_type: str, channel: RectangularChannel,
+                      x_boundary_type: str = "reflective") -> WallModel:
     if model_type == "specular":
-        return SpecularWall(channel)
+        return SpecularWall(channel, x_boundary_type=x_boundary_type)
     else:
         raise ValueError(f"Unknown wall model type: {model_type}")
 

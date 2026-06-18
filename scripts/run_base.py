@@ -1,6 +1,7 @@
 import sys
 import yaml
 import numpy as np
+import pandas as pd
 from pathlib import Path
 
 # Add project root to path so imports work when running as python scripts/run_base.py
@@ -18,6 +19,9 @@ from src.visualization.plots import (
     plot_collision_counts,
     plot_mean_free_path,
     plot_free_path_histogram,
+    plot_mean_vx_vs_time,
+    plot_mean_vy_vs_time,
+    plot_temperature_vs_time,
 )
 
 
@@ -41,7 +45,9 @@ def load_config_from_yaml(yaml_path):
         wall_model_type=config_dict.get('wall_model_type', 'specular'),
         save_vtk=True,
         save_vtk_every=20,
-        vtk_output_dir="outputs/vtk"
+        vtk_output_dir="outputs/vtk",
+        external_force_x=config_dict.get('external_force_x', 0.0),
+        x_boundary_type=config_dict.get('x_boundary_type', 'reflective'),
     )
 
     return config
@@ -66,7 +72,9 @@ def run_base_simulation():
         wall_model_type="specular",
         save_vtk=True,
         save_vtk_every=20,
-        vtk_output_dir="outputs/vtk"
+        vtk_output_dir="outputs/vtk",
+        external_force_x=0.0,
+        x_boundary_type="reflective",
     )
 
     print(f"Configuration:")
@@ -76,6 +84,8 @@ def run_base_simulation():
     print(f"  Time step: {config.time_step}, Total time: {config.total_time}")
     print(f"  Steps: {config.num_steps}, Save every: {config.save_interval} steps")
     print(f"  Equilibration steps: {config.equilibration_steps}")
+    print(f"  External force x: {config.external_force_x}")
+    print(f"  X boundary: {config.x_boundary_type}")
     print(f"  Wall model: {config.wall_model_type}")
     if config.save_vtk:
         print(f"  VTK export: enabled (every {config.save_vtk_every} steps)")
@@ -176,8 +186,39 @@ def run_base_simulation():
     plot_free_path_histogram(history, free_path_histogram_path)
     print(f"  Free path histogram saved to: {free_path_histogram_path}")
 
+    flow_history_path = data_dir / 'flow_history.csv'
+    flow_df = pd.DataFrame({
+        'time': history['time'],
+        'mean_vx': history.get('mean_vx', []),
+        'mean_vy': history.get('mean_vy', []),
+        'temperature': history.get('temperature', []),
+    })
+    flow_df.to_csv(flow_history_path, index=False)
+    print(f"  Flow history saved to: {flow_history_path}")
+
+    mean_vx_plot_path = plots_dir / 'mean_vx_vs_time.png'
+    plot_mean_vx_vs_time(history, mean_vx_plot_path)
+    print(f"  Mean v_x plot saved to: {mean_vx_plot_path}")
+
+    mean_vy_plot_path = plots_dir / 'mean_vy_vs_time.png'
+    plot_mean_vy_vs_time(history, mean_vy_plot_path)
+    print(f"  Mean v_y plot saved to: {mean_vy_plot_path}")
+
+    temperature_plot_path = plots_dir / 'temperature_vs_time.png'
+    plot_temperature_vs_time(history, temperature_plot_path)
+    print(f"  Temperature plot saved to: {temperature_plot_path}")
+
+    flow_history_path = data_dir / 'flow_history.csv'
+    flow_df = pd.DataFrame({
+        'time': history['time'],
+        'mean_vx': history.get('mean_vx', []),
+        'mean_vy': history.get('mean_vy', []),
+        'temperature': history.get('temperature', []),
+    })
+    flow_df.to_csv(flow_history_path, index=False)
+    print(f"  Flow history saved to: {flow_history_path}")
+
     # Save history data
-    import numpy as np
     history_data = {
         'time': np.array(history['time']),
         'total_energy': np.array(history['total_energy']),
@@ -235,6 +276,8 @@ def run_custom_simulation(config_file=None):
         print(f"  Time step: {config.time_step}, Total time: {config.total_time}")
         print(f"  Steps: {config.num_steps}, Save every: {config.save_interval} steps")
         print(f"  Wall model: {config.wall_model_type}")
+        print(f"  External force x: {config.external_force_x}")
+        print(f"  X boundary: {config.x_boundary_type}")
         if config.save_vtk:
             print(f"  VTK export: enabled (every {config.save_vtk_every} steps)")
             print(f"  VTK output directory: {config.vtk_output_dir}")
@@ -320,8 +363,29 @@ def run_custom_simulation(config_file=None):
         plot_free_path_histogram(history, free_path_histogram_path)
         print(f"  Free path histogram saved to: {free_path_histogram_path}")
 
+        flow_history_path = data_dir / 'flow_history.csv'
+        flow_df = pd.DataFrame({
+            'time': history['time'],
+            'mean_vx': history.get('mean_vx', []),
+            'mean_vy': history.get('mean_vy', []),
+            'temperature': history.get('temperature', []),
+        })
+        flow_df.to_csv(flow_history_path, index=False)
+        print(f"  Flow history saved to: {flow_history_path}")
+
+        mean_vx_plot_path = plots_dir / 'mean_vx_vs_time.png'
+        plot_mean_vx_vs_time(history, mean_vx_plot_path)
+        print(f"  Mean v_x plot saved to: {mean_vx_plot_path}")
+
+        mean_vy_plot_path = plots_dir / 'mean_vy_vs_time.png'
+        plot_mean_vy_vs_time(history, mean_vy_plot_path)
+        print(f"  Mean v_y plot saved to: {mean_vy_plot_path}")
+
+        temperature_plot_path = plots_dir / 'temperature_vs_time.png'
+        plot_temperature_vs_time(history, temperature_plot_path)
+        print(f"  Temperature plot saved to: {temperature_plot_path}")
+
         # Save history data
-        import numpy as np
         history_data = {
             'time': np.array(history['time']),
             'total_energy': np.array(history['total_energy']),

@@ -33,6 +33,9 @@ class SimulationConfig:
     save_vtk: bool = False  # whether to save VTK files for ParaView
     save_vtk_every: int = 20  # save VTK frame every N steps
     vtk_output_dir: str = "outputs/vtk"  # directory for VTK files
+    # Driven flow settings
+    external_force_x: float = 0.0  # constant force applied along x
+    x_boundary_type: str = "reflective"  # options: "reflective", "periodic"
 
     def __post_init__(self):
         if self.width <= 0 or self.height <= 0:
@@ -63,6 +66,11 @@ class SimulationConfig:
             raise ValueError("save_vtk_every must be positive")
         if not self.vtk_output_dir:
             raise ValueError("vtk_output_dir cannot be empty")
+
+        if self.x_boundary_type not in ("reflective", "periodic"):
+            raise ValueError(
+                f"x_boundary_type must be 'reflective' or 'periodic', got {self.x_boundary_type}"
+            )
 
         # Check that particles can fit in the domain
         min_dim = min(self.width, self.height)

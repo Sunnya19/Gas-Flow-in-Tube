@@ -6,11 +6,13 @@ from src.state import SystemState
 from src.geometry.channel import RectangularChannel
 from src.initialization import initialize_system
 from src.dynamics.integrator import EulerIntegrator
+from src.dynamics.forces import apply_external_force
 from src.dynamics.particle_collisions import process_all_collisions
 from src.dynamics.wall_collisions import create_wall_model, process_wall_collisions
 from src.measurements.energy import calculate_total_energy
 from src.measurements.collision_stats import CollisionStats
 from src.measurements.mean_free_path import MeanFreePathStats, update_free_path_measurements
+from src.measurements.flow import compute_flow_temperature, compute_mean_flow_velocity
 from src.io.vtk_writer import save_particles_vtp, save_pvd_file
 
 
@@ -22,7 +24,11 @@ class Simulation:
         # init sys
         self.state, self.channel = initialize_system(config)
         self.integrator = EulerIntegrator(dt=config.time_step)
-        self.wall_model = create_wall_model(config.wall_model_type, self.channel)
+        self.wall_model = create_wall_model(
+            config.wall_model_type,
+            self.channel,
+            x_boundary_type=config.x_boundary_type,
+        )
 
         # History storage
         self.history: Dict[str, List[Any]] = {
@@ -36,6 +42,9 @@ class Simulation:
             'mean_free_path': float("nan"),
             'mean_free_path_history': [],
             'free_path_samples': [],
+            'mean_vx': [],
+            'mean_vy': [],
+            'temperature': [],
         }
 
         # Collision stats
@@ -88,12 +97,30 @@ class Simulation:
         # Save mean free path history
         self.mfp_stats.record_current_mean()
         self.history['mean_free_path_history'].append(self.mfp_stats.mean_free_path())
+        mean_flow = compute_mean_flow_velocity(self.state.velocities)
+        self.history['mean_vx'].append(float(mean_flow[0]))
+        self.history['mean_vy'].append(float(mean_flow[1]))
+        self.history['temperature'].append(
+            compute_flow_temperature(self.state.velocities, self.config.particle_mass)
+        )
 
     def step(self):
         dt = self.config.time_step
 
-        # 1. Integrate positions
+        # 1. Apply external force to particle velocities
+        self.state.velocities = apply_external_force(
+            self.state.velocities,
+            force_x=self.config.external_force_x,
+            mass=self.config.particle_mass,
+            dt=dt,
+        )
+
+        # 2. Integrate positions
         self.state = self.integrator.step(self.state)
+
+        # 3. Apply periodic x boundaries before particle collisions.
+        if self.config.x_boundary_type == "periodic":
+            self.state.positions[:, 0] = self.state.positions[:, 0] % self.channel.width
 
         # Accumulate path length for mean free path
         speeds = np.linalg.norm(self.state.velocities, axis=1)
@@ -121,6 +148,9 @@ class Simulation:
             self.mfp_stats,
             self._measurement_enabled,
         )
+
+        if self.config.x_boundary_type == "periodic":
+            self.state.positions[:, 0] = self.state.positions[:, 0] % self.channel.width
 
         # 3. Handle wall collisions
         new_positions, new_velocities, wall_collision_count = process_wall_collisions(
