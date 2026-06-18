@@ -106,6 +106,73 @@ python tests/test_wall_collision.py
 python tests/test_vtk_writer.py
 ```
 
+### Flow Simulation
+
+A forced flow simulation in a 2D channel with periodic x-boundaries and specular walls.
+
+**How to run:**
+```bash
+python scripts/run_flow.py
+```
+
+With custom parameters:
+```bash
+python scripts/run_flow.py --force 0.005 --particles 200 --time 20.0 --temperature 1.0
+```
+
+**What it does:**
+- Periodic boundary along x (particles wrap around left/right edges)
+- Specular walls along y (elastic reflection at top/bottom)
+- Constant external force `external_force_x` along x, mimicking a pressure gradient
+- Measures mean flow velocity `⟨v_x⟩(t)`, `⟨v_y⟩(t)`, temperature `T(t)`, total energy `E(t)`
+- Computes velocity profile `u_x(y)` at the final state
+
+**Output plots:**
+- `outputs/plots/flow_mean_velocity.png` — `⟨v_x⟩(t)` and `⟨v_y⟩(t)` on the same axes
+- `outputs/plots/flow_temperature.png` — temperature vs time
+- `outputs/plots/flow_energy.png` — total energy vs time
+- `outputs/plots/velocity_profile.png` — `u_x(y)` profile
+
+**Physical notes:**
+- With `external_force_x > 0`, `⟨v_x⟩` becomes positive (gas flows along x)
+- `⟨v_y⟩` remains near zero (no force in y-direction)
+- Temperature and energy may increase because there is no thermostat in this version
+- On specular walls, the velocity profile `u_x(y)` is nearly flat because specular walls do not impose a no-slip condition
+- This is expected physical behaviour for a first-order flow model
+
+**CLI arguments:**
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--force` | 0.005 | External force along x |
+| `--particles` | 200 | Number of particles |
+| `--time` | 20.0 | Total simulation time |
+| `--temperature` | 1.0 | Initial temperature |
+| `--save-vtk` | (off) | Enable VTK export |
+| `--no-vtk` | (default) | Disable VTK export |
+
+### Reproducible Knudsen Sweep
+
+A sweep over particle counts with multiple random seeds for reproducible results.
+
+**How to run:**
+```bash
+python scripts/run_reproducible_knudsen_sweep.py
+```
+
+**Output files:**
+- `outputs/data/sweep_results.csv` — detailed per-run results (N, seed, lambda, Kn, regime, collisions, energy drift)
+- `outputs/data/sweep_summary.csv` — summary statistics per N (mean ± std over seeds)
+- `outputs/plots/lambda_vs_N.png` — mean free path vs N with error bars
+- `outputs/plots/kn_vs_N.png` — Knudsen number vs N with error bars and Kn=1 line
+
+**Physical meaning:**
+- As N increases, density increases, mean free path decreases, and Kn decreases.
+- The Kn=1 line on the Kn plot marks the boundary between transition and continuum/slip regimes.
+
+**Reproducibility:**
+- Each run uses `random_seed` in `SimulationConfig` for deterministic initialization.
+- Two runs with the same seed produce identical initial positions and velocities.
+
 ## Requirements
 - Python 3.12+
 - numpy, matplotlib, pyvista, vtk, pytest, pyyaml

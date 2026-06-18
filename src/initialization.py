@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Optional, Tuple
 import numpy as np
 
 from src.state import SystemState
@@ -10,7 +10,10 @@ def generate_random_positions(
         radius: float,
         channel: RectangularChannel,
         max_attempts: int = 10000,
+        rng: Optional[np.random.Generator] = None,
 ) -> np.ndarray:
+    if rng is None:
+        rng = np.random.default_rng()
 
     positions = np.zeros((num_particles, 2))
     diameter = 2 * radius
@@ -22,8 +25,8 @@ def generate_random_positions(
 
         while not placed and attempts < max_attempts:
             # Generate random position within channel boundaries
-            x = np.random.uniform(radius, channel.width - radius)
-            y = np.random.uniform(radius, channel.height - radius)
+            x = rng.uniform(radius, channel.width - radius)
+            y = rng.uniform(radius, channel.height - radius)
             candidate = np.array([x, y])
 
             # Check overlap with already placed particles
@@ -52,11 +55,18 @@ def generate_random_positions(
     return positions
 
 
-def generate_maxwell_velocities(num_particles: int, temperature: float) -> np.ndarray:
+def generate_maxwell_velocities(
+    num_particles: int,
+    temperature: float,
+    rng: Optional[np.random.Generator] = None,
+) -> np.ndarray:
+    if rng is None:
+        rng = np.random.default_rng()
+
     # Generate velocities from normal distribution
     # For 2D, variance is sqrt(temperature) with m = 1, k_B = 1
     std = np.sqrt(temperature)
-    velocities = np.random.normal(0, std, size=(num_particles, 2))
+    velocities = rng.normal(0, std, size=(num_particles, 2))
 
     # Subtract center-of-mass velocity
     com_velocity = np.mean(velocities, axis=0)
@@ -81,19 +91,24 @@ def scale_velocities_to_temperature(velocities: np.ndarray, target_temperature: 
 
 
 def initialize_system(config) -> Tuple[SystemState, RectangularChannel]:
+    # Create RNG from config seed if provided
+    rng = np.random.default_rng(config.random_seed) if config.random_seed is not None else None
+
     # channel geometry
     channel = RectangularChannel(width=config.width, height=config.height)
 
     positions = generate_random_positions(
         num_particles=config.num_particles,
         radius=config.particle_radius,
-        channel=channel
+        channel=channel,
+        rng=rng,
     )
 
     # M-B distr
     velocities = generate_maxwell_velocities(
         num_particles=config.num_particles,
-        temperature=config.initial_temperature
+        temperature=config.initial_temperature,
+        rng=rng,
     )
 
     # Scale to exact temperature

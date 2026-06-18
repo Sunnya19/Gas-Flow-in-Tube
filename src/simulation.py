@@ -70,7 +70,8 @@ class Simulation:
         self._measurement_enabled = (config.equilibration_steps == 0)
 
         # Select particles to track for trajectories
-        self.tracked_particles = np.random.choice(
+        rng = np.random.default_rng(config.random_seed) if config.random_seed is not None else np.random.default_rng()
+        self.tracked_particles = rng.choice(
             config.num_particles,
             size=min(config.num_trajectory_particles, config.num_particles),
             replace=False

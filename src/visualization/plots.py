@@ -385,6 +385,57 @@ def plot_temperature_vs_time(history: Dict[str, List[Any]], output_path: Optiona
         plt.show()
 
 
+def plot_mean_velocity(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    """
+    Plot mean flow velocity components v_x(t) and v_y(t) on the same axes.
+    """
+    time = np.array(history['time'])
+    mean_vx = np.array(history.get('mean_vx', []), dtype=float)
+    mean_vy = np.array(history.get('mean_vy', []), dtype=float)
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(time, mean_vx, 'b-', linewidth=2, label=r'$\langle v_x \rangle$')
+    ax.plot(time, mean_vy, 'g-', linewidth=2, label=r'$\langle v_y \rangle$')
+    ax.axhline(y=0.0, color='gray', linestyle=':', alpha=0.5)
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Mean velocity', fontsize=12)
+    ax.set_title('Mean Flow Velocity vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_flow_energy(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
+    """
+    Plot total energy over time for flow simulation.
+    """
+    time = np.array(history['time'])
+    energy = np.array(history['total_energy'])
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(time, energy, 'r-', linewidth=2, label='Total energy')
+    ax.set_xlabel('Time', fontsize=12)
+    ax.set_ylabel('Total energy', fontsize=12)
+    ax.set_title('Total Energy vs Time', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
 def plot_free_path_histogram(history: Dict[str, List[Any]], output_path: Optional[Path] = None):
     samples = history.get('free_path_samples', [])
 
@@ -406,6 +457,61 @@ def plot_free_path_histogram(history: Dict[str, List[Any]], output_path: Optiona
                label=f'Mean: {mean_val:.4f}')
     ax.legend(fontsize=11)
 
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_sweep_lambda_vs_N(
+    particle_counts: List[int],
+    lambda_means: np.ndarray,
+    lambda_stds: np.ndarray,
+    output_path: Optional[Path] = None,
+):
+    """
+    Plot mean free path vs number of particles with error bars.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.errorbar(particle_counts, lambda_means, yerr=lambda_stds,
+                fmt='o-', capsize=5, capthick=1.5, linewidth=2, markersize=8)
+    ax.set_xlabel('Number of particles $N$', fontsize=12)
+    ax.set_ylabel(r'Mean free path $\lambda_{MD}$', fontsize=12)
+    ax.set_title(r'Mean free path $\lambda_{MD}$ vs $N$', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(output_path, dpi=150)
+        plt.close()
+    else:
+        plt.show()
+
+
+def plot_sweep_kn_vs_N(
+    particle_counts: List[int],
+    kn_means: np.ndarray,
+    kn_stds: np.ndarray,
+    output_path: Optional[Path] = None,
+):
+    """
+    Plot Knudsen number vs number of particles with error bars and Kn=1 line.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.errorbar(particle_counts, kn_means, yerr=kn_stds,
+                fmt='s-', capsize=5, capthick=1.5, linewidth=2, markersize=8)
+    ax.axhline(y=1.0, color='r', linestyle='--', linewidth=1.5,
+               alpha=0.7, label=r'$Kn = 1$ (transition boundary)')
+    ax.set_xlabel('Number of particles $N$', fontsize=12)
+    ax.set_ylabel('Knudsen number $Kn$', fontsize=12)
+    ax.set_title('Knudsen number $Kn$ vs $N$', fontsize=14)
+    ax.grid(True, alpha=0.3)
+    ax.legend(fontsize=11)
     plt.tight_layout()
 
     if output_path:

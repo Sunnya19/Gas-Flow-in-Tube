@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -25,6 +26,9 @@ class SimulationConfig:
 
     # Sampling
     num_trajectory_particles: int = 5  # number of particles to track for trajectories
+
+    # Reproducibility
+    random_seed: Optional[int] = None  # seed for reproducible initialization
 
     # Wall model type
     wall_model_type: str = "specular"  # options: "specular", "diffuse_same_speed", "diffuse_thermal"
