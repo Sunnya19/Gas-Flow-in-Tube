@@ -176,6 +176,57 @@ python scripts/run_reproducible_knudsen_sweep.py
 - Each run uses `random_seed` in `SimulationConfig` for deterministic initialization.
 - Two runs with the same seed produce identical initial positions and velocities.
 
+### Viscosity and Reynolds Estimate
+
+The project estimates viscosity from kinetic theory:
+
+```
+eta_kin = C * rho_2D * v_rms * lambda_MD
+```
+
+with `C = 0.5` by default.
+
+The Reynolds number is estimated as:
+
+```
+Re = rho_2D * U * R / eta_kin
+```
+
+where:
+
+- `U` is the late-time mean streamwise velocity;
+- `R = H / 2` is the channel half-height;
+- `lambda_MD` is measured from molecular collisions.
+
+**Caution:** This is a qualitative estimate for a 2D hard-disk gas.
+
+**How to run — wall model seed sweep:**
+```bash
+python scripts/run_wall_model_seed_sweep.py --particles 80 --time 3.0 --height 6.0 --bins 15 --force 0.005 --seeds 1,2,3,4,5,6,7,8
+```
+
+**How to run — viscosity density sweep:**
+```bash
+python scripts/run_viscosity_density_sweep.py --particles 40,60,80,120,160,240,320 --seeds 1,2,3 --time 3.0 --height 6.0 --force 0.005
+```
+
+**Output files (wall model seed sweep):**
+- `outputs/data/wall_model_seed_sweep_results.csv` — per-run results
+- `outputs/data/wall_model_seed_sweep_summary.csv` — summary per wall model
+- `outputs/plots/wall_seed_viscosity_bar.png` — eta_kin by wall model
+- `outputs/plots/wall_seed_reynolds_bar.png` — Re by wall model with Re=1, Re=100 lines
+- `outputs/plots/wall_seed_kn_re_scatter.png` — Kn–Re map
+- `outputs/plots/wall_seed_viscosity_vs_mean_free_path.png` — eta_kin vs lambda_MD
+
+**Output files (viscosity density sweep):**
+- `outputs/data/viscosity_density_sweep_results.csv` — per-run results
+- `outputs/data/viscosity_density_sweep_summary.csv` — summary per N
+- `outputs/plots/viscosity_density_lambda_vs_density.png`
+- `outputs/plots/viscosity_density_eta_vs_density.png`
+- `outputs/plots/viscosity_density_kn_vs_density.png`
+- `outputs/plots/viscosity_density_re_vs_density.png`
+- `outputs/plots/viscosity_density_kn_re_map.png`
+
 ## Requirements
 - Python 3.12+
 - numpy, matplotlib, pyvista, vtk, pytest, pyyaml
