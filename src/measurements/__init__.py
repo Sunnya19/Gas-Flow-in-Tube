@@ -1,2 +1,3 @@
 from src.measurements.collision_stats import CollisionStats
+from src.measurements.knudsen import classify_knudsen_number, compute_knudsen_number
 from src.measurements.mean_free_path import MeanFreePathStats

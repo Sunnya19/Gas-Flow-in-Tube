@@ -1,11 +1,16 @@
 import sys
 import yaml
+import numpy as np
 from pathlib import Path
 
 # Add project root to path so imports work when running as python scripts/run_base.py
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.config import SimulationConfig
+from src.measurements.knudsen import (
+    classify_knudsen_number,
+    compute_knudsen_number,
+)
 from src.simulation import Simulation
 from src.visualization.plots import (
     plot_energy,
@@ -108,8 +113,17 @@ def run_base_simulation():
     mfp = history['mean_free_path']
     samples = history['free_path_samples']
     n_samples = len(samples)
+    characteristic_length = config.height / 2.0
+    kn = compute_knudsen_number(
+        mean_free_path=mfp,
+        characteristic_length=characteristic_length,
+    )
+    regime = classify_knudsen_number(kn) if np.isfinite(kn) else "unknown"
+
     print(f"    lambda_MD: {mfp:.6f}")
     print(f"    Number of free path samples: {n_samples}")
+    print(f"    Knudsen number: {kn:.6f}")
+    print(f"    Regime: {regime}")
 
     if n_samples > 0:
         import math
@@ -256,8 +270,17 @@ def run_custom_simulation(config_file=None):
         print(f"\n  Mean free path:")
         mfp = history['mean_free_path']
         n_samples = len(history['free_path_samples'])
+        characteristic_length = config.height / 2.0
+        kn = compute_knudsen_number(
+            mean_free_path=mfp,
+            characteristic_length=characteristic_length,
+        )
+        regime = classify_knudsen_number(kn) if np.isfinite(kn) else "unknown"
+
         print(f"    lambda_MD: {mfp:.6f}")
         print(f"    Free path samples: {n_samples}")
+        print(f"    Knudsen number: {kn:.6f}")
+        print(f"    Regime: {regime}")
 
         # Relative energy drift
         initial_energy = energy_history[0]
